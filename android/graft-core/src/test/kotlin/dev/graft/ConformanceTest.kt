@@ -57,4 +57,23 @@ class ConformanceTest {
         if (failures.isNotEmpty()) fail(failures.joinToString("\n"))
         assertTrue(true)
     }
+
+    @Test
+    fun inputs() {
+        val file = load("inputs.json")
+        val failures = mutableListOf<String>()
+        for (c in file.getValue("coerce").jsonArray.map { it.jsonObject }) {
+            val props = c["props"] as? JsonObject
+            val bounds = InputBounds(J.num(props?.get("min")), J.num(props?.get("max")), J.num(props?.get("step")))
+            val got = Inputs.coerce(c.getValue("kind").jsonPrimitive.content, c.getValue("raw"), bounds)
+            if (!same(got, c.getValue("expect"))) failures += "coerce ${c["name"]}: expected ${c["expect"]}, got $got"
+        }
+        for (c in file.getValue("options").jsonArray.map { it.jsonObject }) {
+            val got = JsonArray(Inputs.options(c.getValue("options")).map {
+                JsonObject(mapOf("label" to J.of(it.label), "value" to it.value))
+            })
+            if (!same(got, c.getValue("expect"))) failures += "options ${c["name"]}: expected ${c["expect"]}, got $got"
+        }
+        if (failures.isNotEmpty()) fail(failures.joinToString("\n"))
+    }
 }

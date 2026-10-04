@@ -58,6 +58,17 @@ export const GRAFT_CSS = `
 .graft-divider { border: 0; border-top: 1px solid var(--graft-border); margin: 4px 0; width: 100%; }
 .graft-c-default { color: inherit; } .graft-c-muted { color: var(--graft-muted); } .graft-c-accent { color: var(--graft-accent-c); }
 .graft-c-positive { color: var(--graft-positive); } .graft-c-negative { color: var(--graft-negative); } .graft-c-warning { color: var(--graft-warning); }
+.graft-input { display: flex; flex-direction: column; gap: 4px; font-size: 13px; min-width: 0; flex: 1; }
+.graft-input-label { color: var(--graft-muted); }
+/* Controls set their own flex/size so generic host rules (e.g. "input { flex: 1 }") don't distort them. */
+.graft-control { font: inherit; font-size: 15px; color: inherit; background: transparent; border: 1px solid var(--graft-border);
+  border-radius: 8px; padding: 6px 8px; min-width: 0; width: 100%; box-sizing: border-box; flex: none; margin: 0; }
+.graft-control:focus { outline: 2px solid var(--graft-accent-c); outline-offset: 1px; }
+textarea.graft-control { min-height: 64px; resize: vertical; }
+.graft-input-slider, .graft-input-toggle { flex-direction: row; align-items: center; justify-content: flex-start; gap: 8px; }
+.graft-input-slider .graft-control { padding: 0; border: 0; accent-color: var(--graft-accent-c); flex: 1 1 auto; width: auto; }
+.graft-input-value { font-variant-numeric: tabular-nums; min-width: 2.5em; text-align: right; }
+.graft-input-toggle .graft-control { width: 18px; height: 18px; padding: 0; accent-color: var(--graft-accent-c); order: -1; }
 .graft-error { font-size: 13px; color: var(--graft-negative); border: 1px dashed var(--graft-negative); border-radius: var(--graft-r); padding: 12px; }
 
 .graft-fab { position: fixed; right: 20px; bottom: 20px; z-index: 2147483000; border: 0; border-radius: 999px; padding: 12px 18px;

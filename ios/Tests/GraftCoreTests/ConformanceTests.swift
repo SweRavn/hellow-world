@@ -61,3 +61,24 @@ final class ConformanceTests: XCTestCase {
         XCTAssertThrowsError(try Evaluator(vars: [:]).evaluate(expr))
     }
 }
+
+final class InputConformanceTests: XCTestCase {
+    func testInputs() throws {
+        let dir = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("spec/conformance")
+        let file = try JSON.parse(Data(contentsOf: dir.appendingPathComponent("inputs.json")))
+        var failures: [String] = []
+        for c in file["coerce"]!.array! {
+            let props = c["props"]?.object
+            let bounds = InputBounds(min: props?["min"]?.number, max: props?["max"]?.number, step: props?["step"]?.number)
+            let got = Inputs.coerce(c["kind"]!.string!, c["raw"]!, bounds: bounds)
+            if got != c["expect"]! { failures.append("coerce \(c["name"]!.serialized): expected \(c["expect"]!.serialized), got \(got.serialized)") }
+        }
+        for c in file["options"]!.array! {
+            let got = JSON.array(Inputs.options(c["options"]!).map { JSON.object(JSONObject([("label", .string($0.label)), ("value", $0.value)])) })
+            if got != c["expect"]! { failures.append("options \(c["name"]!.serialized): expected \(c["expect"]!.serialized), got \(got.serialized)") }
+        }
+        XCTAssert(failures.isEmpty, failures.joined(separator: "\n"))
+    }
+}

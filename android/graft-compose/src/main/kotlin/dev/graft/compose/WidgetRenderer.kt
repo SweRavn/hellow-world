@@ -21,7 +21,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import dev.graft.BoundWidget
+import dev.graft.Graft
+import dev.graft.Inputs
+import dev.graft.WidgetSpec
 import dev.graft.ItemScope
 import dev.graft.Limits
 import kotlinx.serialization.json.JsonArray
@@ -45,7 +54,7 @@ internal fun tokenColor(v: JsonElement): Color {
     }
 }
 
-private fun str(v: JsonElement): String = when {
+internal fun str(v: JsonElement): String = when {
     v is JsonNull -> ""
     v is JsonPrimitive && v.isString -> v.content
     v is JsonPrimitive -> v.doubleOrNull?.let { d -> if (d == Math.rint(d) && kotlin.math.abs(d) < 1e15) d.toLong().toString() else d.toString() } ?: v.content
@@ -62,10 +71,33 @@ private fun truthy(v: JsonElement): Boolean = when {
     else -> true
 }
 
-/** Renders a bound widget spec with Material 3 components. */
+/** Receives (state name, coerced value) when the user changes an input; null renders inputs read-only. */
+internal val LocalInputHandler = staticCompositionLocalOf<((String, JsonElement) -> Unit)?> { null }
+
+/**
+ * Renders a bound widget spec with Material 3 components. Use [LiveWidget] to get working inputs;
+ * this lower-level entry point reports input changes through [onInput].
+ */
 @Composable
-fun RenderWidget(widget: BoundWidget, modifier: Modifier = Modifier) {
-    Box(modifier) { Node(widget, widget.spec.root, null) }
+fun RenderWidget(widget: BoundWidget, modifier: Modifier = Modifier, onInput: ((String, JsonElement) -> Unit)? = null) {
+    CompositionLocalProvider(LocalInputHandler provides onInput) {
+        Box(modifier) { Node(widget, widget.spec.root, null) }
+    }
+}
+
+/**
+ * Renders a widget spec against a data snapshot and owns its input state: formulas recompute as the
+ * user types. State is kept while [spec] stays the same and resets when it changes (e.g. after an edit).
+ */
+@Composable
+fun LiveWidget(graft: Graft, spec: WidgetSpec, data: Map<String, JsonElement>, modifier: Modifier = Modifier) {
+    var state by remember(spec) { mutableStateOf(Inputs.initialState(spec)) }
+    val bound = remember(spec, data, state) { runCatching { graft.bind(spec, data, state) }.getOrNull() }
+    if (bound != null) {
+        RenderWidget(bound, modifier, onInput = { name, value -> state = state + (name to value) })
+    } else {
+        Text("“${spec.title}” could not be shown.", modifier, color = MaterialTheme.colorScheme.error)
+    }
 }
 
 @Composable
@@ -94,7 +126,11 @@ private fun Node(w: BoundWidget, n: JsonObject, scope: ItemScope?) {
                 else -> Arrangement.spacedBy(gap)
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = arrangement, verticalAlignment = Alignment.CenterVertically) {
-                children.forEach { Node(w, it, scope) }
+                // Inputs share the row's width; other children keep their natural size.
+                children.forEach { c ->
+                    if ((c["type"] as? JsonPrimitive)?.content == "input") Box(Modifier.weight(1f)) { Node(w, c, scope) }
+                    else Node(w, c, scope)
+                }
             }
         }
         "text" -> {
@@ -162,6 +198,7 @@ private fun Node(w: BoundWidget, n: JsonObject, scope: ItemScope?) {
             )
         }
         "divider" -> HorizontalDivider()
+        "input" -> InputNode(w, n, ev("label").takeIf { it !is JsonNull }?.let(::str), ev("placeholder").takeIf { it !is JsonNull }?.let(::str)) { ev("options") }
         "visible" -> if (truthy(ev("when"))) Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { children.forEach { Node(w, it, scope) } }
         else -> Unit // unreachable for validated specs
     }

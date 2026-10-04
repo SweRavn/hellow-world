@@ -5,6 +5,48 @@ const thisMonth = { filter: [v("transactions"), { ">=": [{ toTime: [v("item.date
 
 const recipes = [
   {
+    match: /add .*numbers|sum of two|plus/i,
+    spec: {
+      title: "Add two numbers",
+      slot: "home.top",
+      state: { a: null, b: null },
+      root: {
+        type: "card", title: "Calculator",
+        children: [
+          { type: "row", children: [
+            { type: "input", kind: "number", bind: "a", label: "First number", placeholder: "0" },
+            { type: "input", kind: "number", bind: "b", label: "Second number", placeholder: "0" },
+          ] },
+          { type: "metric", label: "Sum", value: { "+": [v("state.a"), v("state.b")] } },
+        ],
+      },
+    },
+  },
+  {
+    match: /split|share|bill/i,
+    spec: {
+      title: "Split a bill",
+      slot: "home.top",
+      state: { amount: null, people: 2, tip: true, payer: null },
+      bindings: {
+        total: { "*": [{ "??": [v("state.amount"), 0] }, { if: [v("state.tip"), 1.1, 1] }] },
+        each: { "/": [v("total"), v("state.people")] },
+      },
+      root: {
+        type: "card", title: "Split a bill",
+        children: [
+          { type: "input", kind: "number", bind: "amount", label: "Bill amount (EUR)", min: 0 },
+          { type: "input", kind: "slider", bind: "people", label: "People", min: 1, max: 12, step: 1 },
+          { type: "input", kind: "toggle", bind: "tip", label: "Add 10% tip" },
+          { type: "input", kind: "select", bind: "payer", label: "Who paid?",
+            options: { pluck: [{ take: [{ group: [v("transactions"), v("item.merchant")] }, 5] }, "key"] } },
+          { type: "metric", label: "Each person pays", value: { format: [v("each"), "currency"] }, color: "accent",
+            caption: { concat: ["Total ", { format: [v("total"), "currency"] }, { if: [v("state.payer"), { concat: [" · paid at ", v("state.payer")] }, ""] }] } },
+        ],
+      },
+    },
+  },
+  {
     match: /categor|breakdown|where.*money/i,
     spec: {
       title: "Spend by category",
@@ -83,7 +125,7 @@ export class MockGenerator {
       : {
           title: "Not understood",
           slot: "home.top",
-          root: { type: "card", title: "Mock generator", children: [{ type: "text", value: "The offline mock only knows: food, budget, categories, biggest purchases. Run the server with an API key for anything else." }] },
+          root: { type: "card", title: "Mock generator", children: [{ type: "text", value: "The offline mock only knows: food, budget, categories, biggest purchases, add two numbers, split a bill. Run the server with an API key for anything else." }] },
         };
     return {
       specVersion: 1,

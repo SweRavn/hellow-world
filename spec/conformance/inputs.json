@@ -1,0 +1,240 @@
+{
+  "coerce": [
+    {
+      "name": "text passes through",
+      "kind": "text",
+      "raw": "hello",
+      "expect": "hello"
+    },
+    {
+      "name": "text from number",
+      "kind": "text",
+      "raw": 5,
+      "expect": "5"
+    },
+    {
+      "name": "text null",
+      "kind": "text",
+      "raw": null,
+      "expect": null
+    },
+    {
+      "name": "number from string",
+      "kind": "number",
+      "raw": "12.5",
+      "expect": 12.5
+    },
+    {
+      "name": "number decimal comma",
+      "kind": "number",
+      "raw": " 1,5 ",
+      "expect": 1.5
+    },
+    {
+      "name": "number negative",
+      "kind": "number",
+      "raw": "-3",
+      "expect": -3
+    },
+    {
+      "name": "number empty",
+      "kind": "number",
+      "raw": "",
+      "expect": null
+    },
+    {
+      "name": "number garbage",
+      "kind": "number",
+      "raw": "12abc",
+      "expect": null
+    },
+    {
+      "name": "number not clamped while typing",
+      "kind": "number",
+      "raw": "1",
+      "props": {
+        "min": 10
+      },
+      "expect": 1
+    },
+    {
+      "name": "number from number",
+      "kind": "number",
+      "raw": 7,
+      "expect": 7
+    },
+    {
+      "name": "slider clamps high",
+      "kind": "slider",
+      "raw": 150,
+      "props": {
+        "min": 0,
+        "max": 100
+      },
+      "expect": 100
+    },
+    {
+      "name": "slider clamps low",
+      "kind": "slider",
+      "raw": -5,
+      "props": {
+        "min": 0,
+        "max": 100
+      },
+      "expect": 0
+    },
+    {
+      "name": "slider snaps to step",
+      "kind": "slider",
+      "raw": 0.27,
+      "props": {
+        "min": 0,
+        "max": 1,
+        "step": 0.1
+      },
+      "expect": 0.3
+    },
+    {
+      "name": "slider snaps relative to min",
+      "kind": "slider",
+      "raw": 4.4,
+      "props": {
+        "min": 1,
+        "max": 10,
+        "step": 2
+      },
+      "expect": 5
+    },
+    {
+      "name": "slider garbage to min",
+      "kind": "slider",
+      "raw": "x",
+      "props": {
+        "min": 2,
+        "max": 4
+      },
+      "expect": 2
+    },
+    {
+      "name": "toggle bool",
+      "kind": "toggle",
+      "raw": false,
+      "expect": false
+    },
+    {
+      "name": "toggle truthy",
+      "kind": "toggle",
+      "raw": "on",
+      "expect": true
+    },
+    {
+      "name": "select string",
+      "kind": "select",
+      "raw": "Food",
+      "expect": "Food"
+    },
+    {
+      "name": "select number",
+      "kind": "select",
+      "raw": 3,
+      "expect": 3
+    },
+    {
+      "name": "select invalid",
+      "kind": "select",
+      "raw": true,
+      "expect": null
+    },
+    {
+      "name": "date plain",
+      "kind": "date",
+      "raw": "2026-10-04",
+      "expect": "2026-10-04"
+    },
+    {
+      "name": "date from datetime",
+      "kind": "date",
+      "raw": "2026-10-04T10:00:00Z",
+      "expect": "2026-10-04"
+    },
+    {
+      "name": "date invalid month",
+      "kind": "date",
+      "raw": "2026-13-01",
+      "expect": null
+    },
+    {
+      "name": "date garbage",
+      "kind": "date",
+      "raw": "04/10/2026",
+      "expect": null
+    }
+  ],
+  "options": [
+    {
+      "name": "strings",
+      "options": [
+        "a",
+        "b"
+      ],
+      "expect": [
+        {
+          "label": "a",
+          "value": "a"
+        },
+        {
+          "label": "b",
+          "value": "b"
+        }
+      ]
+    },
+    {
+      "name": "numbers",
+      "options": [
+        1,
+        2
+      ],
+      "expect": [
+        {
+          "label": "1",
+          "value": 1
+        },
+        {
+          "label": "2",
+          "value": 2
+        }
+      ]
+    },
+    {
+      "name": "objects",
+      "options": [
+        {
+          "label": "Food",
+          "value": "food"
+        },
+        {
+          "value": "fun"
+        },
+        {
+          "label": "bad"
+        },
+        true
+      ],
+      "expect": [
+        {
+          "label": "Food",
+          "value": "food"
+        },
+        {
+          "label": "fun",
+          "value": "fun"
+        }
+      ]
+    },
+    {
+      "name": "not a list",
+      "options": "a",
+      "expect": []
+    }
+  ]
+}

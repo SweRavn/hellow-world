@@ -106,6 +106,8 @@ public struct HttpGenerator: Generator {
 /// A spec bound to a data snapshot, ready to render.
 public struct BoundWidget {
     public let spec: WidgetSpec
+    /// Current input values, by state name.
+    public let state: [String: JSON]
     let vars: [String: JSON]
     let formatter: GraftFormatter
 
@@ -148,7 +150,8 @@ public final class Graft: ObservableObject {
 
     @discardableResult
     public func addDataSource(_ name: String, _ source: DataSource) -> Self {
-        precondition(name.range(of: "^[A-Za-z_][A-Za-z0-9_]*$", options: .regularExpression) != nil, "invalid data source name \(name)")
+        precondition(name.range(of: "^[A-Za-z_][A-Za-z0-9_]*$", options: .regularExpression) != nil && name != "state",
+                     "invalid data source name \(name)")
         sources.removeAll { $0.0 == name }
         sources.append((name, source))
         return self
@@ -225,9 +228,15 @@ public final class Graft: ObservableObject {
         return out
     }
 
-    /// Resolves bindings against a data snapshot. Throws `EvalError` if the budget is exceeded.
-    public func bind(_ spec: WidgetSpec, data: [String: JSON]) throws -> BoundWidget {
-        BoundWidget(spec: spec, vars: try resolveBindings(spec.bindings, data: data, formatter: formatter), formatter: formatter)
+    /// Resolves bindings against a data snapshot and the widget's input `state` (defaults to its initial
+    /// values). Throws `EvalError` if the budget is exceeded.
+    public func bind(_ spec: WidgetSpec, data: [String: JSON], state: [String: JSON]? = nil) throws -> BoundWidget {
+        let state = state ?? Inputs.initialState(spec)
+        var scope = data
+        if spec.state != nil {
+            scope["state"] = .object(JSONObject(state.sorted { $0.key < $1.key }.map { ($0.key, $0.value) }))
+        }
+        return BoundWidget(spec: spec, state: state, vars: try resolveBindings(spec.bindings, data: scope, formatter: formatter), formatter: formatter)
     }
 }
 

@@ -10,6 +10,9 @@ internal object Catalog {
     data object Expr : Kind
     data object Color : Kind
     data object Number : Kind
+    data object Signed : Kind
+    data object Bool : Kind
+    data object StateRef : Kind
     data object Node : Kind
     data object Children : Kind
     data class Enum(val values: List<String>) : Kind
@@ -30,6 +33,13 @@ internal object Catalog {
         "barChart" to mapOf("items" to Prop(Expr, true), "max" to Prop(Expr)),
         "badge" to mapOf("value" to Prop(Expr, true), "color" to color),
         "divider" to emptyMap(),
+        "input" to mapOf(
+            "kind" to Prop(Enum(listOf("text", "number", "slider", "toggle", "select", "date")), required = true),
+            "bind" to Prop(StateRef, required = true),
+            "label" to Prop(Expr), "placeholder" to Prop(Expr),
+            "min" to Prop(Signed), "max" to Prop(Signed), "step" to Prop(Signed),
+            "options" to Prop(Expr), "multiline" to Prop(Bool),
+        ),
         "visible" to mapOf("when" to Prop(Expr, true), "children" to children),
     )
 }
@@ -41,6 +51,7 @@ sealed interface ValidationResult {
 
 private val RESERVED = setOf("item", "index")
 private val IDENT = Regex("^[A-Za-z_][A-Za-z0-9_]*$")
+private val ISO_DATE = Regex("^\\d{4}-\\d{2}-\\d{2}$")
 
 /** Statically validates an untrusted widget spec against the manifest and component catalog. */
 fun validateSpec(input: JsonElement, manifest: Manifest): ValidationResult {
@@ -58,6 +69,22 @@ fun validateSpec(input: JsonElement, manifest: Manifest): ValidationResult {
     if (slot == null || slot !in manifest.slots) err("slot", "unknown slot \"$slot\"; available: ${manifest.slots.keys.joinToString()}")
 
     val known = manifest.dataSources.keys.toMutableSet()
+
+    // Widget-local state: named, literal initial values that inputs read and write.
+    val state = spec["state"] as? JsonObject
+    if (spec["state"] != null) {
+        if (state == null) err("state", "must be an object of name -> initial value")
+        else {
+            if (state.size > Limits.MAX_STATE_ENTRIES) err("state", "at most ${Limits.MAX_STATE_ENTRIES} state entries")
+            for ((name, v) in state) {
+                if (!IDENT.matches(name)) err("state.$name", "state names must be identifiers")
+                val literal = J.isNull(v) || J.bool(v) != null || J.num(v) != null || (J.str(v)?.let { it.length <= Limits.MAX_TEXT_LENGTH } ?: false)
+                if (!literal) err("state.$name", "initial value must be a literal string, number, boolean or null")
+            }
+            if ("state" in manifest.dataSources) err("state", "conflicts with a data source named \"state\"")
+            known += "state"
+        }
+    }
 
     fun checkExpr(e: JsonElement, path: String, inIter: Boolean) {
         if (e is JsonArray) return e.forEachIndexed { i, x -> checkExpr(x, "$path[$i]", inIter) }
@@ -89,12 +116,44 @@ fun validateSpec(input: JsonElement, manifest: Manifest): ValidationResult {
         else -> {
             if (b.size > Limits.MAX_BINDINGS) err("bindings", "at most ${Limits.MAX_BINDINGS} bindings")
             for ((name, expr) in b) {
-                if (name in RESERVED || name in manifest.dataSources || !IDENT.matches(name)) {
-                    err("bindings.$name", "invalid binding name (must be an identifier, not a data source name, item or index)")
+                if (name in RESERVED || name == "state" || name in manifest.dataSources || !IDENT.matches(name)) {
+                    err("bindings.$name", "invalid binding name (must be an identifier, not a data source name, item, index or state)")
                 }
                 checkExpr(expr, "bindings.$name", false)
                 known += name
             }
+        }
+    }
+
+    /** Cross-prop rules for inputs: per-kind required props and state value types. */
+    fun checkInput(n: JsonObject, path: String, inIter: Boolean) {
+        if (inIter) err(path, "inputs cannot be inside list templates")
+        val kind = J.str(n["kind"])
+        val initial = J.str(n["bind"])?.let { state?.get(it) }
+        val numeric = kind == "number" || kind == "slider"
+        for (p in listOf("min", "max", "step")) if (p in n && !numeric) err("$path.$p", "only applies to number and slider inputs")
+        if ("placeholder" in n && kind != "text" && kind != "number") err("$path.placeholder", "only applies to text and number inputs")
+        if ("multiline" in n && kind != "text") err("$path.multiline", "only applies to text inputs")
+        if (("options" in n) != (kind == "select")) err("$path.options", if (kind == "select") "select inputs need options" else "only applies to select inputs")
+        val min = J.num(n["min"])
+        val max = J.num(n["max"])
+        if (kind == "slider" && (min == null || max == null)) err(path, "slider inputs need min and max")
+        if (min != null && max != null && min > max) err("$path.min", "min must be <= max")
+        J.num(n["step"])?.let { if (it <= 0) err("$path.step", "step must be > 0") }
+        if (initial == null) return
+        val isNull = J.isNull(initial)
+        val ok = when (kind) {
+            "toggle" -> J.bool(initial) != null
+            "slider" -> J.num(initial) != null
+            "number" -> isNull || J.num(initial) != null
+            "date" -> isNull || J.str(initial)?.let { ISO_DATE.matches(it) } == true
+            "select" -> isNull || J.str(initial) != null || J.num(initial) != null
+            else -> isNull || J.str(initial) != null
+        }
+        if (!ok) {
+            val want = mapOf("toggle" to "a boolean", "slider" to "a number", "number" to "a number or null",
+                "date" to "\"YYYY-MM-DD\" or null", "select" to "a string, number or null", "text" to "a string or null")[kind]
+            err("$path.bind", "state \"${J.str(n["bind"])}\" must start as ${want ?: "a compatible value"} for a $kind input")
         }
     }
 
@@ -119,6 +178,14 @@ fun validateSpec(input: JsonElement, manifest: Manifest): ValidationResult {
                         ?: err(p, "must be an array of nodes")
                 Catalog.Node -> checkNode(value, p, inIter || pd.iterates, depth + 1)
                 Catalog.Number -> if ((J.num(value) ?: -1.0) < 0) err(p, "must be a non-negative number literal")
+                Catalog.Signed -> if (J.num(value) == null) err(p, "must be a number literal")
+                Catalog.Bool -> if (J.bool(value) == null) err(p, "must be true or false")
+                Catalog.StateRef -> {
+                    val ref = J.str(value)
+                    if (ref == null || state == null || ref !in state) {
+                        err(p, "must name a declared state entry; declared: ${state?.keys?.joinToString()?.ifEmpty { "none" } ?: "none (add a top-level \"state\" object)"}")
+                    }
+                }
                 Catalog.Color -> {
                     val s = J.str(value)
                     if (s != null) {
@@ -131,6 +198,7 @@ fun validateSpec(input: JsonElement, manifest: Manifest): ValidationResult {
         }
         for ((prop, pd) in props) if (pd.required && prop !in obj) err("$path.$prop", "required prop \"$prop\" missing on $type")
         if (type == "list" && (J.num(obj["limit"]) ?: 0.0) > Limits.MAX_LIST_LIMIT) err("$path.limit", "limit must be <= ${Limits.MAX_LIST_LIMIT}")
+        if (type == "input") checkInput(obj, path, inIter)
     }
 
     if (spec["root"] == null) err("root", "missing") else checkNode(spec["root"], "root", false, 1)

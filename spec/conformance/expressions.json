@@ -1,130 +1,981 @@
 {
   "data": {
     "tx": [
-      { "amount": 12.5, "category": "Food", "merchant": "Cafe Nero", "date": "2026-10-01T12:00:00Z" },
-      { "amount": 40, "category": "Transport", "merchant": "SJ", "date": "2026-10-02T08:30:00Z" },
-      { "amount": 7.5, "category": "Food", "merchant": "ICA", "date": "2026-09-28T18:00:00Z" },
-      { "amount": 100, "category": "Rent", "merchant": "Landlord", "date": "2026-09-01T00:00:00Z" }
+      {
+        "amount": 12.5,
+        "category": "Food",
+        "merchant": "Cafe Nero",
+        "date": "2026-10-01T12:00:00Z"
+      },
+      {
+        "amount": 40,
+        "category": "Transport",
+        "merchant": "SJ",
+        "date": "2026-10-02T08:30:00Z"
+      },
+      {
+        "amount": 7.5,
+        "category": "Food",
+        "merchant": "ICA",
+        "date": "2026-09-28T18:00:00Z"
+      },
+      {
+        "amount": 100,
+        "category": "Rent",
+        "merchant": "Landlord",
+        "date": "2026-09-01T00:00:00Z"
+      }
     ],
-    "user": { "name": "Ada", "budget": 500, "tags": ["vip", "beta"] },
-    "empty": []
+    "user": {
+      "name": "Ada",
+      "budget": 500,
+      "tags": [
+        "vip",
+        "beta"
+      ]
+    },
+    "empty": [],
+    "state": {
+      "a": 2,
+      "b": 3
+    }
   },
   "cases": [
-    { "name": "literal number", "expr": 42, "expect": 42 },
-    { "name": "literal string", "expr": "hi", "expect": "hi" },
-    { "name": "literal array of exprs", "expr": [1, { "+": [1, 1] }], "expect": [1, 2] },
-    { "name": "var object path", "expr": { "var": "user.name" }, "expect": "Ada" },
-    { "name": "var single arg shorthand", "expr": { "var": ["user.budget"] }, "expect": 500 },
-    { "name": "var array index", "expr": { "var": "tx.1.merchant" }, "expect": "SJ" },
-    { "name": "var missing", "expr": { "var": "user.nope" }, "expect": null },
-    { "name": "var default", "expr": { "var": ["user.nope", 7] }, "expect": 7 },
-    { "name": "add", "expr": { "+": [1, 2, 3.5] }, "expect": 6.5 },
-    { "name": "add null as zero", "expr": { "+": [1, null] }, "expect": 1 },
-    { "name": "subtract", "expr": { "-": [10, 4] }, "expect": 6 },
-    { "name": "negate", "expr": { "-": [5] }, "expect": -5 },
-    { "name": "multiply", "expr": { "*": [2, 3, 4] }, "expect": 24 },
-    { "name": "multiply null", "expr": { "*": [2, null] }, "expect": null },
-    { "name": "divide", "expr": { "/": [7, 2] }, "expect": 3.5 },
-    { "name": "divide by zero", "expr": { "/": [7, 0] }, "expect": null },
-    { "name": "modulo", "expr": { "%": [7, 3] }, "expect": 1 },
-    { "name": "round", "expr": { "round": [2.345, 2] }, "expect": 2.35 },
-    { "name": "round half away from zero", "expr": { "round": [-2.5] }, "expect": -3 },
-    { "name": "eq numbers", "expr": { "==": [1, 1.0] }, "expect": true },
-    { "name": "eq no coercion", "expr": { "==": [1, "1"] }, "expect": false },
-    { "name": "neq", "expr": { "!=": ["a", "b"] }, "expect": true },
-    { "name": "gt", "expr": { ">": [3, 2] }, "expect": true },
-    { "name": "lte strings", "expr": { "<=": ["apple", "banana"] }, "expect": true },
-    { "name": "compare null false", "expr": { ">": [null, 0] }, "expect": false },
-    { "name": "compare mismatched false", "expr": { "<": ["1", 2] }, "expect": false },
-    { "name": "and", "expr": { "and": [true, 1, "x"] }, "expect": true },
-    { "name": "and falsy empty list", "expr": { "and": [true, []] }, "expect": false },
-    { "name": "or", "expr": { "or": [0, "", null, 3] }, "expect": true },
-    { "name": "not", "expr": { "not": [""] }, "expect": true },
-    { "name": "not single", "expr": { "not": 1 }, "expect": false },
-    { "name": "if then", "expr": { "if": [true, "a", "b"] }, "expect": "a" },
-    { "name": "if else missing", "expr": { "if": [false, "a"] }, "expect": null },
-    { "name": "coalesce", "expr": { "??": [null, "fallback"] }, "expect": "fallback" },
-    { "name": "coalesce keeps zero", "expr": { "??": [0, 5] }, "expect": 0 },
-    { "name": "count", "expr": { "count": [{ "var": "tx" }] }, "expect": 4 },
-    { "name": "count non-list", "expr": { "count": [{ "var": "user" }] }, "expect": 0 },
-    { "name": "sum field", "expr": { "sum": [{ "var": "tx" }, "amount"] }, "expect": 160 },
-    { "name": "sum plain", "expr": { "sum": [[1, 2, 3]] }, "expect": 6 },
-    { "name": "sum empty", "expr": { "sum": [{ "var": "empty" }, "amount"] }, "expect": 0 },
-    { "name": "avg", "expr": { "avg": [{ "var": "tx" }, "amount"] }, "expect": 40 },
-    { "name": "avg empty", "expr": { "avg": [{ "var": "empty" }] }, "expect": null },
-    { "name": "min", "expr": { "min": [{ "var": "tx" }, "amount"] }, "expect": 7.5 },
-    { "name": "max", "expr": { "max": [{ "var": "tx" }, "amount"] }, "expect": 100 },
-    { "name": "sum skips non-numbers", "expr": { "sum": [[1, "x", null, 2]] }, "expect": 3 },
+    {
+      "name": "literal number",
+      "expr": 42,
+      "expect": 42
+    },
+    {
+      "name": "literal string",
+      "expr": "hi",
+      "expect": "hi"
+    },
+    {
+      "name": "literal array of exprs",
+      "expr": [
+        1,
+        {
+          "+": [
+            1,
+            1
+          ]
+        }
+      ],
+      "expect": [
+        1,
+        2
+      ]
+    },
+    {
+      "name": "var object path",
+      "expr": {
+        "var": "user.name"
+      },
+      "expect": "Ada"
+    },
+    {
+      "name": "var single arg shorthand",
+      "expr": {
+        "var": [
+          "user.budget"
+        ]
+      },
+      "expect": 500
+    },
+    {
+      "name": "var array index",
+      "expr": {
+        "var": "tx.1.merchant"
+      },
+      "expect": "SJ"
+    },
+    {
+      "name": "var missing",
+      "expr": {
+        "var": "user.nope"
+      },
+      "expect": null
+    },
+    {
+      "name": "var default",
+      "expr": {
+        "var": [
+          "user.nope",
+          7
+        ]
+      },
+      "expect": 7
+    },
+    {
+      "name": "add",
+      "expr": {
+        "+": [
+          1,
+          2,
+          3.5
+        ]
+      },
+      "expect": 6.5
+    },
+    {
+      "name": "add null as zero",
+      "expr": {
+        "+": [
+          1,
+          null
+        ]
+      },
+      "expect": 1
+    },
+    {
+      "name": "subtract",
+      "expr": {
+        "-": [
+          10,
+          4
+        ]
+      },
+      "expect": 6
+    },
+    {
+      "name": "negate",
+      "expr": {
+        "-": [
+          5
+        ]
+      },
+      "expect": -5
+    },
+    {
+      "name": "multiply",
+      "expr": {
+        "*": [
+          2,
+          3,
+          4
+        ]
+      },
+      "expect": 24
+    },
+    {
+      "name": "multiply null",
+      "expr": {
+        "*": [
+          2,
+          null
+        ]
+      },
+      "expect": null
+    },
+    {
+      "name": "divide",
+      "expr": {
+        "/": [
+          7,
+          2
+        ]
+      },
+      "expect": 3.5
+    },
+    {
+      "name": "divide by zero",
+      "expr": {
+        "/": [
+          7,
+          0
+        ]
+      },
+      "expect": null
+    },
+    {
+      "name": "modulo",
+      "expr": {
+        "%": [
+          7,
+          3
+        ]
+      },
+      "expect": 1
+    },
+    {
+      "name": "round",
+      "expr": {
+        "round": [
+          2.345,
+          2
+        ]
+      },
+      "expect": 2.35
+    },
+    {
+      "name": "round half away from zero",
+      "expr": {
+        "round": [
+          -2.5
+        ]
+      },
+      "expect": -3
+    },
+    {
+      "name": "eq numbers",
+      "expr": {
+        "==": [
+          1,
+          1.0
+        ]
+      },
+      "expect": true
+    },
+    {
+      "name": "eq no coercion",
+      "expr": {
+        "==": [
+          1,
+          "1"
+        ]
+      },
+      "expect": false
+    },
+    {
+      "name": "neq",
+      "expr": {
+        "!=": [
+          "a",
+          "b"
+        ]
+      },
+      "expect": true
+    },
+    {
+      "name": "gt",
+      "expr": {
+        ">": [
+          3,
+          2
+        ]
+      },
+      "expect": true
+    },
+    {
+      "name": "lte strings",
+      "expr": {
+        "<=": [
+          "apple",
+          "banana"
+        ]
+      },
+      "expect": true
+    },
+    {
+      "name": "compare null false",
+      "expr": {
+        ">": [
+          null,
+          0
+        ]
+      },
+      "expect": false
+    },
+    {
+      "name": "compare mismatched false",
+      "expr": {
+        "<": [
+          "1",
+          2
+        ]
+      },
+      "expect": false
+    },
+    {
+      "name": "and",
+      "expr": {
+        "and": [
+          true,
+          1,
+          "x"
+        ]
+      },
+      "expect": true
+    },
+    {
+      "name": "and falsy empty list",
+      "expr": {
+        "and": [
+          true,
+          []
+        ]
+      },
+      "expect": false
+    },
+    {
+      "name": "or",
+      "expr": {
+        "or": [
+          0,
+          "",
+          null,
+          3
+        ]
+      },
+      "expect": true
+    },
+    {
+      "name": "not",
+      "expr": {
+        "not": [
+          ""
+        ]
+      },
+      "expect": true
+    },
+    {
+      "name": "not single",
+      "expr": {
+        "not": 1
+      },
+      "expect": false
+    },
+    {
+      "name": "if then",
+      "expr": {
+        "if": [
+          true,
+          "a",
+          "b"
+        ]
+      },
+      "expect": "a"
+    },
+    {
+      "name": "if else missing",
+      "expr": {
+        "if": [
+          false,
+          "a"
+        ]
+      },
+      "expect": null
+    },
+    {
+      "name": "coalesce",
+      "expr": {
+        "??": [
+          null,
+          "fallback"
+        ]
+      },
+      "expect": "fallback"
+    },
+    {
+      "name": "coalesce keeps zero",
+      "expr": {
+        "??": [
+          0,
+          5
+        ]
+      },
+      "expect": 0
+    },
+    {
+      "name": "count",
+      "expr": {
+        "count": [
+          {
+            "var": "tx"
+          }
+        ]
+      },
+      "expect": 4
+    },
+    {
+      "name": "count non-list",
+      "expr": {
+        "count": [
+          {
+            "var": "user"
+          }
+        ]
+      },
+      "expect": 0
+    },
+    {
+      "name": "sum field",
+      "expr": {
+        "sum": [
+          {
+            "var": "tx"
+          },
+          "amount"
+        ]
+      },
+      "expect": 160
+    },
+    {
+      "name": "sum plain",
+      "expr": {
+        "sum": [
+          [
+            1,
+            2,
+            3
+          ]
+        ]
+      },
+      "expect": 6
+    },
+    {
+      "name": "sum empty",
+      "expr": {
+        "sum": [
+          {
+            "var": "empty"
+          },
+          "amount"
+        ]
+      },
+      "expect": 0
+    },
+    {
+      "name": "avg",
+      "expr": {
+        "avg": [
+          {
+            "var": "tx"
+          },
+          "amount"
+        ]
+      },
+      "expect": 40
+    },
+    {
+      "name": "avg empty",
+      "expr": {
+        "avg": [
+          {
+            "var": "empty"
+          }
+        ]
+      },
+      "expect": null
+    },
+    {
+      "name": "min",
+      "expr": {
+        "min": [
+          {
+            "var": "tx"
+          },
+          "amount"
+        ]
+      },
+      "expect": 7.5
+    },
+    {
+      "name": "max",
+      "expr": {
+        "max": [
+          {
+            "var": "tx"
+          },
+          "amount"
+        ]
+      },
+      "expect": 100
+    },
+    {
+      "name": "sum skips non-numbers",
+      "expr": {
+        "sum": [
+          [
+            1,
+            "x",
+            null,
+            2
+          ]
+        ]
+      },
+      "expect": 3
+    },
     {
       "name": "filter",
-      "expr": { "pluck": [{ "filter": [{ "var": "tx" }, { "==": [{ "var": "item.category" }, "Food"] }] }, "merchant"] },
-      "expect": ["Cafe Nero", "ICA"]
+      "expr": {
+        "pluck": [
+          {
+            "filter": [
+              {
+                "var": "tx"
+              },
+              {
+                "==": [
+                  {
+                    "var": "item.category"
+                  },
+                  "Food"
+                ]
+              }
+            ]
+          },
+          "merchant"
+        ]
+      },
+      "expect": [
+        "Cafe Nero",
+        "ICA"
+      ]
     },
     {
       "name": "map",
-      "expr": { "map": [{ "var": "tx" }, { "*": [{ "var": "item.amount" }, 2] }] },
-      "expect": [25, 80, 15, 200]
+      "expr": {
+        "map": [
+          {
+            "var": "tx"
+          },
+          {
+            "*": [
+              {
+                "var": "item.amount"
+              },
+              2
+            ]
+          }
+        ]
+      },
+      "expect": [
+        25,
+        80,
+        15,
+        200
+      ]
     },
     {
       "name": "map with index",
-      "expr": { "map": [["a", "b"], { "concat": [{ "var": "index" }, ":", { "var": "item" }] }] },
-      "expect": ["0:a", "1:b"]
+      "expr": {
+        "map": [
+          [
+            "a",
+            "b"
+          ],
+          {
+            "concat": [
+              {
+                "var": "index"
+              },
+              ":",
+              {
+                "var": "item"
+              }
+            ]
+          }
+        ]
+      },
+      "expect": [
+        "0:a",
+        "1:b"
+      ]
     },
     {
       "name": "sort desc by field",
-      "expr": { "pluck": [{ "sort": [{ "var": "tx" }, "amount", "desc"] }, "amount"] },
-      "expect": [100, 40, 12.5, 7.5]
-    },
-    { "name": "sort plain asc", "expr": { "sort": [[3, 1, 2]] }, "expect": [1, 2, 3] },
-    {
-      "name": "sort stable",
-      "expr": { "pluck": [{ "sort": [{ "var": "tx" }, "category"] }, "merchant"] },
-      "expect": ["Cafe Nero", "ICA", "Landlord", "SJ"]
-    },
-    { "name": "take", "expr": { "take": [[1, 2, 3], 2] }, "expect": [1, 2] },
-    { "name": "first", "expr": { "first": [{ "var": "tx" }] }, "expect": { "amount": 12.5, "category": "Food", "merchant": "Cafe Nero", "date": "2026-10-01T12:00:00Z" } },
-    { "name": "last empty", "expr": { "last": [{ "var": "empty" }] }, "expect": null },
-    {
-      "name": "group",
-      "expr": { "group": [{ "var": "tx" }, { "var": "item.category" }, { "var": "item.amount" }] },
+      "expr": {
+        "pluck": [
+          {
+            "sort": [
+              {
+                "var": "tx"
+              },
+              "amount",
+              "desc"
+            ]
+          },
+          "amount"
+        ]
+      },
       "expect": [
-        { "key": "Food", "count": 2, "sum": 20 },
-        { "key": "Transport", "count": 1, "sum": 40 },
-        { "key": "Rent", "count": 1, "sum": 100 }
+        100,
+        40,
+        12.5,
+        7.5
       ]
     },
-    { "name": "group without value", "expr": { "group": [["a", "b", "a"], { "var": "item" }] }, "expect": [{ "key": "a", "count": 2, "sum": 0 }, { "key": "b", "count": 1, "sum": 0 }] },
-    { "name": "concat", "expr": { "concat": ["Hi ", { "var": "user.name" }, null, "! ", 2, " ", 2.5] }, "expect": "Hi Ada! 2 2.5" },
-    { "name": "lower", "expr": { "lower": ["AbC"] }, "expect": "abc" },
-    { "name": "upper", "expr": { "upper": "abc" }, "expect": "ABC" },
-    { "name": "contains string", "expr": { "contains": ["Cafe Nero", "Nero"] }, "expect": true },
-    { "name": "contains list", "expr": { "contains": [{ "var": "user.tags" }, "beta"] }, "expect": true },
-    { "name": "contains list miss", "expr": { "contains": [{ "var": "user.tags" }, "alpha"] }, "expect": false },
-    { "name": "toTime iso", "expr": { "toTime": ["2026-10-01T12:00:00Z"] }, "expect": 1790856000000 },
-    { "name": "toTime number", "expr": { "toTime": [1000] }, "expect": 1000 },
-    { "name": "toTime garbage", "expr": { "toTime": ["not a date"] }, "expect": null },
-    { "name": "addDays", "expr": { "addDays": [0, 2] }, "expect": 172800000 },
+    {
+      "name": "sort plain asc",
+      "expr": {
+        "sort": [
+          [
+            3,
+            1,
+            2
+          ]
+        ]
+      },
+      "expect": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "name": "sort stable",
+      "expr": {
+        "pluck": [
+          {
+            "sort": [
+              {
+                "var": "tx"
+              },
+              "category"
+            ]
+          },
+          "merchant"
+        ]
+      },
+      "expect": [
+        "Cafe Nero",
+        "ICA",
+        "Landlord",
+        "SJ"
+      ]
+    },
+    {
+      "name": "take",
+      "expr": {
+        "take": [
+          [
+            1,
+            2,
+            3
+          ],
+          2
+        ]
+      },
+      "expect": [
+        1,
+        2
+      ]
+    },
+    {
+      "name": "first",
+      "expr": {
+        "first": [
+          {
+            "var": "tx"
+          }
+        ]
+      },
+      "expect": {
+        "amount": 12.5,
+        "category": "Food",
+        "merchant": "Cafe Nero",
+        "date": "2026-10-01T12:00:00Z"
+      }
+    },
+    {
+      "name": "last empty",
+      "expr": {
+        "last": [
+          {
+            "var": "empty"
+          }
+        ]
+      },
+      "expect": null
+    },
+    {
+      "name": "group",
+      "expr": {
+        "group": [
+          {
+            "var": "tx"
+          },
+          {
+            "var": "item.category"
+          },
+          {
+            "var": "item.amount"
+          }
+        ]
+      },
+      "expect": [
+        {
+          "key": "Food",
+          "count": 2,
+          "sum": 20
+        },
+        {
+          "key": "Transport",
+          "count": 1,
+          "sum": 40
+        },
+        {
+          "key": "Rent",
+          "count": 1,
+          "sum": 100
+        }
+      ]
+    },
+    {
+      "name": "group without value",
+      "expr": {
+        "group": [
+          [
+            "a",
+            "b",
+            "a"
+          ],
+          {
+            "var": "item"
+          }
+        ]
+      },
+      "expect": [
+        {
+          "key": "a",
+          "count": 2,
+          "sum": 0
+        },
+        {
+          "key": "b",
+          "count": 1,
+          "sum": 0
+        }
+      ]
+    },
+    {
+      "name": "concat",
+      "expr": {
+        "concat": [
+          "Hi ",
+          {
+            "var": "user.name"
+          },
+          null,
+          "! ",
+          2,
+          " ",
+          2.5
+        ]
+      },
+      "expect": "Hi Ada! 2 2.5"
+    },
+    {
+      "name": "lower",
+      "expr": {
+        "lower": [
+          "AbC"
+        ]
+      },
+      "expect": "abc"
+    },
+    {
+      "name": "upper",
+      "expr": {
+        "upper": "abc"
+      },
+      "expect": "ABC"
+    },
+    {
+      "name": "contains string",
+      "expr": {
+        "contains": [
+          "Cafe Nero",
+          "Nero"
+        ]
+      },
+      "expect": true
+    },
+    {
+      "name": "contains list",
+      "expr": {
+        "contains": [
+          {
+            "var": "user.tags"
+          },
+          "beta"
+        ]
+      },
+      "expect": true
+    },
+    {
+      "name": "contains list miss",
+      "expr": {
+        "contains": [
+          {
+            "var": "user.tags"
+          },
+          "alpha"
+        ]
+      },
+      "expect": false
+    },
+    {
+      "name": "toTime iso",
+      "expr": {
+        "toTime": [
+          "2026-10-01T12:00:00Z"
+        ]
+      },
+      "expect": 1790856000000
+    },
+    {
+      "name": "toTime number",
+      "expr": {
+        "toTime": [
+          1000
+        ]
+      },
+      "expect": 1000
+    },
+    {
+      "name": "toTime garbage",
+      "expr": {
+        "toTime": [
+          "not a date"
+        ]
+      },
+      "expect": null
+    },
+    {
+      "name": "addDays",
+      "expr": {
+        "addDays": [
+          0,
+          2
+        ]
+      },
+      "expect": 172800000
+    },
     {
       "name": "object",
-      "expr": { "map": [{ "take": [{ "var": "tx" }, 1] }, { "object": ["label", { "var": "item.merchant" }, "value", { "var": "item.amount" }] }] },
-      "expect": [{ "label": "Cafe Nero", "value": 12.5 }]
+      "expr": {
+        "map": [
+          {
+            "take": [
+              {
+                "var": "tx"
+              },
+              1
+            ]
+          },
+          {
+            "object": [
+              "label",
+              {
+                "var": "item.merchant"
+              },
+              "value",
+              {
+                "var": "item.amount"
+              }
+            ]
+          }
+        ]
+      },
+      "expect": [
+        {
+          "label": "Cafe Nero",
+          "value": 12.5
+        }
+      ]
     },
     {
       "name": "nested item shadowing",
-      "expr": { "map": [[[1, 2], [3]], { "sum": [{ "map": [{ "var": "item" }, { "*": [{ "var": "item" }, 10] }] }] }] },
-      "expect": [30, 30]
+      "expr": {
+        "map": [
+          [
+            [
+              1,
+              2
+            ],
+            [
+              3
+            ]
+          ],
+          {
+            "sum": [
+              {
+                "map": [
+                  {
+                    "var": "item"
+                  },
+                  {
+                    "*": [
+                      {
+                        "var": "item"
+                      },
+                      10
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "expect": [
+        30,
+        30
+      ]
     },
     {
       "name": "binding lookup",
-      "bindings": { "food": { "filter": [{ "var": "tx" }, { "==": [{ "var": "item.category" }, "Food"] }] } },
-      "expr": { "sum": [{ "var": "food" }, "amount"] },
+      "bindings": {
+        "food": {
+          "filter": [
+            {
+              "var": "tx"
+            },
+            {
+              "==": [
+                {
+                  "var": "item.category"
+                },
+                "Food"
+              ]
+            }
+          ]
+        }
+      },
+      "expr": {
+        "sum": [
+          {
+            "var": "food"
+          },
+          "amount"
+        ]
+      },
       "expect": 20
     },
     {
       "name": "binding references earlier binding",
-      "bindings": { "a": 2, "b": { "*": [{ "var": "a" }, 10] } },
-      "expr": { "var": "b" },
+      "bindings": {
+        "a": 2,
+        "b": {
+          "*": [
+            {
+              "var": "a"
+            },
+            10
+          ]
+        }
+      },
+      "expr": {
+        "var": "b"
+      },
       "expect": 20
+    },
+    {
+      "name": "state values add",
+      "expr": {
+        "+": [
+          {
+            "var": "state.a"
+          },
+          {
+            "var": "state.b"
+          }
+        ]
+      },
+      "expect": 5
     }
   ]
 }

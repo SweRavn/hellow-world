@@ -28,7 +28,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import dev.graft.BoundWidget
+import kotlinx.serialization.json.JsonElement
 import dev.graft.Graft
 import dev.graft.GraftException
 import dev.graft.WidgetSpec
@@ -52,7 +52,8 @@ fun VibeSheet(
     var prompt by remember { mutableStateOf("") }
     var selectedSlot by remember { mutableStateOf(edit?.slot ?: slot) }
     var current by remember { mutableStateOf(edit) }
-    var preview by remember { mutableStateOf<BoundWidget?>(null) }
+    var preview by remember { mutableStateOf<WidgetSpec?>(null) }
+    var previewData by remember { mutableStateOf<Map<String, JsonElement>>(emptyMap()) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
@@ -63,7 +64,8 @@ fun VibeSheet(
         scope.launch {
             try {
                 val spec = graft.propose(prompt.trim(), selectedSlot, current)
-                preview = graft.bind(spec, graft.snapshot())
+                previewData = graft.snapshot()
+                preview = spec
                 current = spec
                 prompt = ""
             } catch (e: GraftException) {
@@ -106,8 +108,11 @@ fun VibeSheet(
             if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
             error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
             preview?.let {
-                RenderWidget(
+                // Live preview: the user can already try the widget's inputs before adding it.
+                LiveWidget(
+                    graft,
                     it,
+                    previewData,
                     Modifier.fillMaxWidth()
                         .border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(16.dp))
                         .padding(8.dp),
@@ -121,7 +126,7 @@ fun VibeSheet(
                         busy = true
                         scope.launch {
                             try {
-                                graft.accept(p.spec)
+                                graft.accept(p)
                                 onDismiss()
                             } catch (e: Exception) {
                                 error = "Could not save the widget."

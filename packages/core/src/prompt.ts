@@ -32,6 +32,7 @@ Reply with exactly one JSON object (no prose, no markdown fences):
   "title": "<short human title>",
   "slot": "<one of the manifest slots>",
   "prompt": "<the user's request, verbatim>",
+  "state": { "<name>": <literal initial value>, ... },   // optional, only when the widget has inputs
   "bindings": { "<name>": <expression>, ... },   // optional, evaluated in order; later bindings may use earlier ones
   "root": <node>
 }
@@ -56,13 +57,26 @@ Operators: ${Object.keys(OPERATORS).join(", ")}.
 - object[k1, v1, k2, v2, ...] builds an object, e.g. map items to {"label","value"} for barChart.
 Dates in data are usually ISO strings: compare them with {"toTime": [...]} against startOf/addDays/now.
 
+# Inputs and state
+Widgets can take user input (calculators, filters, what-if tools). Declare each value in "state" with a literal
+initial value, add an "input" node whose "bind" names it, and read it anywhere (bindings included) with {"var": "state.<name>"}.
+Everything recomputes as the user types. Initial value types: number -> number or null; slider -> number;
+toggle -> boolean; text -> string or null; select -> string, number or null; date -> "YYYY-MM-DD" or null.
+Empty number inputs are null; "+" treats null as 0, but guard divisions and display with "if"/"??" where it matters.
+Inputs cannot be placed inside list templates. Select options may be computed from data, e.g. {"pluck": [{"group": [...]}, "key"]}.
+
 # Rules
 - Use only data sources from the manifest and only fields present in their schemas. Never invent fields.
 - Limits: ${LIMITS.maxNodes} nodes, depth ${LIMITS.maxDepth}, list limit <= ${LIMITS.maxListLimit}. Prefer small, focused widgets: one card.
 - Respect the slot description (size, purpose). If the user did not name a slot, choose the most fitting one.
 - When modifying an existing widget, keep its id and slot unless asked otherwise.
 
-# Example
+# Examples
+{"specVersion":1,"id":"add_numbers","title":"Add two numbers","slot":"home.top","prompt":"add two numbers",
+ "state":{"a":null,"b":null},
+ "root":{"type":"card","title":"Calculator","children":[{"type":"row","children":[
+   {"type":"input","kind":"number","bind":"a","label":"First"},{"type":"input","kind":"number","bind":"b","label":"Second"}]},
+   {"type":"metric","label":"Sum","value":{"+":[{"var":"state.a"},{"var":"state.b"}]}}]}}
 {"specVersion":1,"id":"food_month","title":"Food this month","slot":"home.top","prompt":"how much did I spend on food this month?",
  "bindings":{"food":{"filter":[{"var":"transactions"},{"and":[{"==":[{"var":"item.category"},"Food"]},{">=":[{"toTime":[{"var":"item.date"}]},{"startOf":["month"]}]}]}]}},
  "root":{"type":"card","title":"Food","children":[{"type":"metric","label":"Spent this month","value":{"format":[{"sum":[{"var":"food"},"amount"]},"currency"]},"caption":{"concat":[{"count":[{"var":"food"}]}," purchases"]}}]}}`;

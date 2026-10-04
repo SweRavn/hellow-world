@@ -2,13 +2,19 @@ import GraftCore
 import SwiftUI
 
 /// Renders a bound widget spec with native SwiftUI views.
+/// Renders a bound widget. Use `LiveWidgetView` for working inputs; here, input changes go to `onInput`.
 public struct WidgetView: View {
     let widget: BoundWidget
+    let onInput: ((String, JSON) -> Void)?
 
-    public init(_ widget: BoundWidget) { self.widget = widget }
+    public init(_ widget: BoundWidget, onInput: ((String, JSON) -> Void)? = nil) {
+        self.widget = widget
+        self.onInput = onInput
+    }
 
     public var body: some View {
         NodeView(widget: widget, node: widget.spec.root, scope: nil)
+            .environment(\.graftInput, onInput)
     }
 }
 
@@ -134,6 +140,10 @@ struct NodeView: View {
                 .overlay(Capsule().stroke(color, lineWidth: 1))
         case "divider":
             Divider()
+        case "input":
+            let label = ev("label"), placeholder = ev("placeholder")
+            InputView(widget: widget, node: node, label: label.isNull ? nil : display(label),
+                      placeholder: placeholder.isNull ? nil : display(placeholder), options: ev("options"))
         case "visible":
             if ev("when").truthy {
                 VStack(alignment: .leading, spacing: 8) { kids() }

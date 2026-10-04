@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { evaluate, resolveBindings, validateSpec, type Json, type Manifest } from "../src/index.js";
+import { coerceInput, evaluate, resolveBindings, selectOptions, validateSpec, type InputKind, type Json, type Manifest } from "../src/index.js";
 
 const load = (f: string) => JSON.parse(readFileSync(new URL(`../../../spec/conformance/${f}`, import.meta.url), "utf8"));
 
@@ -29,4 +29,13 @@ describe("validation conformance", () => {
       }
     });
   }
+});
+
+describe("input conformance", () => {
+  const { coerce, options } = load("inputs.json") as {
+    coerce: { name: string; kind: InputKind; raw: Json; props?: { min?: number; max?: number; step?: number }; expect: Json }[];
+    options: { name: string; options: Json; expect: Json }[];
+  };
+  for (const c of coerce) it(`coerce: ${c.name}`, () => expect(coerceInput(c.kind, c.raw, c.props)).toEqual(c.expect));
+  for (const c of options) it(`options: ${c.name}`, () => expect(selectOptions(c.options)).toEqual(c.expect));
 });

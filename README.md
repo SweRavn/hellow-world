@@ -26,8 +26,9 @@ It works like Lovable, but it lives *inside* your product: you add it as a libra
    `orderDetail.sidebar`, …). Graft never modifies the rest of your UI. It renders only inside slots you placed.
 3. **The user asks for a feature.** The built-in "vibe" panel or sheet sends the prompt and the manifest to your generator
    backend. The backend asks Claude for a **Widget Spec**, which is a JSON document built from a small component catalog
-   (card, metric, list, barChart, progress, …) and a JSONLogic-style expression language (`filter`, `group`, `sum`,
-   `format`, `startOf`, …).
+   (card, metric, list, barChart, progress, input, …) and a JSONLogic-style expression language (`filter`, `group`, `sum`,
+   `format`, `startOf`, …). Widgets can also take user input (text, number, slider, toggle, select and date controls),
+   so users can build calculators, filters and what-if tools. The formulas recompute as they type.
 4. **Validate, preview, accept.** The spec is validated on the server, where errors go back to Claude for repair, and again
    on the device. The user sees a live preview, refines it ("make it weekly instead") and adds it. Accepted widgets are
    persisted, and they re-render whenever your data changes.
@@ -129,7 +130,9 @@ the SDKs small and dependency-free. The shared conformance vectors keep the thre
 ## Roadmap ideas
 
 - **Actions**: host-registered actions (navigate, open a record, call an API with confirmation) that buttons in specs can trigger
-- **Parameters**: widgets with user inputs (date range picker, category filter)
+- **Opt-in general code**: a sandboxed, capability-limited `code` construct that developers can enable for web or
+  internal apps where store rules don't apply (design constraints in [`spec/README.md` §6](spec/README.md))
+- **Persisted input state**: remember what a user typed into a widget across sessions
 - More components (line chart, table, image from allow-listed URLs), and host-provided custom components
 - Sharing and moderation: let admins publish a user's widget to everyone, with a review queue
 - React, Vue and Flutter wrappers

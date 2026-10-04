@@ -8,6 +8,8 @@ public enum Limits {
     public static let maxBindings = 50
     public static let maxListLimit = 100
     public static let maxSteps = 100_000
+    public static let maxStateEntries = 20
+    public static let maxTextLength = 1000
 }
 
 public let colorTokens = ["default", "muted", "accent", "positive", "negative", "warning"]
