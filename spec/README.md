@@ -1,0 +1,179 @@
+# Graft Widget Spec — v1
+
+This document is the **normative contract** shared by every Graft SDK (web,
+Android, iOS) and by every generator backend. A generator turns an end-user's
+natural-language request into a *Widget Spec* (JSON). An SDK validates the spec
+and renders it natively, binding it to live data the host app has exposed.
+
+Specs are **data, not code**. Nothing in a spec is ever executed as
+JavaScript/Kotlin/Swift. This keeps generated features sandboxed, makes them
+portable across platforms, and keeps mobile apps within app-store rules on
+downloaded executable code.
+
+---
+
+## 1. Manifest (host app → generator)
+
+The host app describes what the generator may use. The manifest is the *only*
+thing about the app the LLM sees; live data never leaves the device unless the
+developer puts it in `sample`.
+
+```jsonc
+{
+  "app": { "name": "Budgetly", "description": "Personal expense tracker" },
+  "dataSources": {
+    "transactions": {
+      "description": "The user's card transactions, newest first",
+      "schema": {                         // Schema node, see below
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "amount":   { "type": "number", "description": "In account currency, positive = spend" },
+            "category": { "type": "string" },
+            "date":     { "type": "string", "format": "date-time" }
+          }
+        }
+      },
+      "sample": [ { "amount": 12.5, "category": "Food", "date": "2026-10-01T12:00:00Z" } ]
+    }
+  },
+  "slots": {
+    "home.top": { "description": "Top of the home screen, full width", "maxWidgets": 3 }
+  },
+  "theme": { "currency": "EUR", "locale": "sv-SE" }
+}
+```
+
+**Schema node**: `{ "type": "string"|"number"|"integer"|"boolean"|"array"|"object", "description"?, "format"?, "items"? (array), "properties"? (object), "enum"? }`
+— a small subset of JSON Schema.
+
+**Slots** are explicit, named places in the host UI (`<graft-slot>`,
+`GraftSlot(...)`, `GraftSlotView(...)`). Graft never patches arbitrary host UI;
+it only renders inside slots the developer placed.
+
+---
+
+## 2. Widget Spec (generator → SDK)
+
+```jsonc
+{
+  "specVersion": 1,
+  "id": "w_3f9a",                 // unique, assigned by generator or SDK
+  "title": "Food spend this month",
+  "slot": "home.top",
+  "prompt": "show how much I spent on food this month",   // original request
+  "bindings": {                   // optional named, reusable expressions
+    "foodThisMonth": { "filter": [ { "var": "transactions" },
+      { "and": [ { "==": [ { "var": "item.category" }, "Food" ] },
+                 { ">=": [ { "toTime": [ { "var": "item.date" } ] }, { "startOf": ["month"] } ] } ] } ] }
+  },
+  "root": {
+    "type": "card",
+    "children": [
+      { "type": "metric",
+        "label": "Food this month",
+        "value": { "format": [ { "sum": [ { "var": "foodThisMonth" }, "amount" ] }, "currency" ] } }
+    ]
+  }
+}
+```
+
+### 2.1 Components
+
+Every node is `{ "type": <name>, ...props }`. Any prop marked *expr* accepts
+either a literal value or an expression (§3). `children` is an array of nodes.
+
+| type        | props                                                                                   |
+|-------------|-----------------------------------------------------------------------------------------|
+| `card`      | `title?` (expr string), `children`                                                      |
+| `column`    | `gap?` (number, px/dp/pt), `children`                                                   |
+| `row`       | `gap?`, `align?` (`start`\|`center`\|`end`\|`spaceBetween`), `children`                 |
+| `text`      | `value` (expr), `style?` (`title`\|`body`\|`caption`), `color?` (expr, see §2.2)        |
+| `metric`    | `label` (expr), `value` (expr), `caption?` (expr), `color?` (expr)                      |
+| `progress`  | `value` (expr number), `max?` (expr number, default 1), `label?` (expr)                 |
+| `list`      | `items` (expr array), `template` (node), `empty?` (expr string), `limit?` (number ≤100) |
+| `barChart`  | `items` (expr array of `{label, value}`), `max?` (expr number)                          |
+| `badge`     | `value` (expr), `color?` (expr)                                                         |
+| `divider`   | —                                                                                       |
+| `visible`   | `when` (expr boolean), `children` — renders children only when `when` is truthy         |
+
+Inside a `list` `template`, the scope gains `item` (current element) and
+`index` (0-based).
+
+### 2.2 Colors
+
+Semantic tokens only, so widgets follow the host theme: `default`, `muted`,
+`accent`, `positive`, `negative`, `warning`.
+
+### 2.3 Limits (enforced by every SDK validator)
+
+- at most **200** nodes, depth at most **12**
+- at most **50** bindings; bindings may reference earlier-declared bindings only
+- each expression evaluation is capped at **100 000** steps; exceeding it is a runtime error rendered as an error placeholder, never a crash
+
+---
+
+## 3. Expressions
+
+JSON, JSONLogic-style: an expression is either a literal (`string`, `number`,
+`boolean`, `null`, or an array of expressions) or a **single-key object** whose
+key is an operator and whose value is the argument array (a single non-array
+argument is treated as a one-element array).
+
+Evaluation scope (lookup order): `item`/`index` (inside `filter`/`map`/`sort`/
+`group`/list templates) → bindings → data sources.
+
+| op | args | result |
+|---|---|---|
+| `var` | `path` (dot-separated, numeric segments index arrays), `default?` | value at path, or `default`/`null` |
+| `+` `*` | n numbers | sum / product (`null` treated as 0 for `+`, result `null` for `*`) |
+| `-` | a, b? | a − b, or −a |
+| `/` | a, b | a ÷ b; `null` when b = 0 |
+| `%` | a, b | remainder; `null` when b = 0 |
+| `round` | x, digits? | round half away from zero |
+| `==` `!=` | a, b | strict equality (numbers compared numerically; no type coercion) |
+| `>` `>=` `<` `<=` | a, b | numeric or string comparison; `false` if either is `null`/mismatched |
+| `and` `or` | n | short-circuit, returns boolean |
+| `not` | a | boolean negation of truthiness |
+| `if` | cond, then, else? | |
+| `??` | a, b | a unless `null`, else b |
+| `count` | list | length (`0` for non-list) |
+| `sum` `avg` `min` `max` | list, field? | aggregate of numeric elements (or `item[field]`); `avg`/`min`/`max` of empty → `null`, `sum` → `0` |
+| `filter` | list, predicate | elements for which predicate (with `item`) is truthy |
+| `map` | list, expr | `expr` evaluated per `item` |
+| `sort` | list, field?, `"asc"`\|`"desc"` | stable sort by `item[field]` (or by element) |
+| `take` | list, n | first n elements |
+| `first` `last` | list | element or `null` |
+| `group` | list, keyExpr, valueExpr? | `[{ "key", "count", "sum" }]` in first-seen key order; `sum` sums `valueExpr` (0 if omitted) |
+| `pluck` | list, field | `item[field]` for each element |
+| `concat` | n | string concatenation (`null` → `""`, numbers via shortest round-trip) |
+| `lower` `upper` | s | |
+| `contains` | haystack, needle | substring (strings) or membership (lists) |
+| `format` | value, kind, arg? | localized string; kind ∈ `number` (arg = fraction digits, default 0..2), `currency` (arg = ISO code, default manifest `theme.currency`), `percent` (value 0.25 → "25%"), `date`, `datetime`, `relative` |
+| `now` | — | current time, epoch ms |
+| `toTime` | value | ISO-8601 string or epoch ms → epoch ms; `null` if unparseable |
+| `startOf` | unit, time? | epoch ms at start of `day`\|`week` (Monday)\|`month`\|`year`, device local time zone |
+| `addDays` | time, n | epoch ms |
+| `object` | k1, v1, k2, v2, … | builds an object (use in `map` to make `barChart` items) |
+
+**Truthiness**: `false`, `null`, `0`, `""`, and `[]` are falsy; everything else truthy.
+
+**Errors**: unknown operator or wrong arity is a *validation* error (caught
+before render). Type mismatches at runtime yield `null`, never throw.
+
+---
+
+## 4. Conformance
+
+`conformance/expressions.json` holds evaluation vectors
+(`{ name, data, expr, expect }`) and `conformance/validation.json` holds specs
+that must be accepted or rejected. Every SDK runs them in its test suite;
+`format`/`now`/`startOf` are locale/clock dependent and are excluded from the
+shared vectors.
+
+## 5. Versioning
+
+`specVersion` increments only for breaking changes. SDKs must reject specs with
+a higher version than they support (the generator is told the SDK's version in
+the request).

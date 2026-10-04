@@ -1,0 +1,18 @@
+{
+  "name": "@graft/web",
+  "version": "0.1.0",
+  "description": "Graft for the web: let your users vibe-code widgets into your app.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json && esbuild src/index.ts --bundle --format=esm --target=es2020 --outfile=dist/graft.bundle.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": { "@graft/core": "0.1.0" },
+  "devDependencies": { "esbuild": "^0.25.0", "happy-dom": "^18.0.0" },
+  "license": "MIT"
+}
