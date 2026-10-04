@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Budgetly — Graft demo</title>
+  <style>
+    :root { --bg: #f5f5f7; --fg: #1b1b1f; --muted: #6b6b76; --card: #fff; --border: rgba(0,0,0,.08); --graft-accent: #0f766e; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #111114; --fg: #ececf1; --muted: #a0a0ab; --card: #1c1c22; --border: rgba(255,255,255,.1); } }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.4 system-ui, -apple-system, sans-serif; }
+    header { padding: 16px; display: flex; justify-content: space-between; align-items: center; max-width: 720px; margin: 0 auto; }
+    header h1 { margin: 0; font-size: 20px; }
+    header small { color: var(--muted); }
+    main { max-width: 720px; margin: 0 auto; padding: 0 16px 96px; display: flex; flex-direction: column; gap: 16px; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+    .balance { font-size: 32px; font-weight: 700; }
+    .muted { color: var(--muted); font-size: 13px; }
+    table { width: 100%; border-collapse: collapse; }
+    td { padding: 8px 0; border-bottom: 1px solid var(--border); }
+    td.amt { text-align: right; font-variant-numeric: tabular-nums; }
+    form { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+    input, select, button { font: inherit; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: inherit; }
+    input { flex: 1; min-width: 100px; }
+    .mode { font-size: 12px; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <header>
+    <div><h1>Budgetly</h1><small>Monthly budget: <span id="budget"></span></small></div>
+    <span class="mode" id="mode"></span>
+  </header>
+  <main>
+    <section class="card">
+      <div class="muted">Spent this month</div>
+      <div class="balance" id="spent"></div>
+    </section>
+
+    <!-- Graft slot: user-created widgets appear here -->
+    <div id="slot-home-top"></div>
+
+    <section class="card">
+      <strong>Transactions</strong>
+      <table id="tx"></table>
+      <form id="add">
+        <input name="merchant" placeholder="Merchant" required />
+        <input name="amount" type="number" step="0.01" placeholder="Amount" required />
+        <select name="category">
+          <option>Food</option><option>Transport</option><option>Shopping</option><option>Rent</option><option>Fun</option>
+        </select>
+        <button>Add</button>
+      </form>
+    </section>
+
+    <!-- A second slot further down -->
+    <div id="slot-home-bottom"></div>
+  </main>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

@@ -1,0 +1,113 @@
+{
+  "manifest": {
+    "app": { "name": "Test app" },
+    "dataSources": {
+      "tx": { "description": "transactions", "schema": { "type": "array", "items": { "type": "object" } } },
+      "user": { "description": "the user", "schema": { "type": "object" } }
+    },
+    "slots": { "home.top": { "description": "top of home" } }
+  },
+  "cases": [
+    {
+      "name": "minimal valid",
+      "valid": true,
+      "spec": { "specVersion": 1, "id": "w1", "title": "T", "slot": "home.top", "root": { "type": "text", "value": "hello" } }
+    },
+    {
+      "name": "valid with bindings and list",
+      "valid": true,
+      "spec": {
+        "specVersion": 1, "id": "w2", "title": "T", "slot": "home.top",
+        "bindings": { "big": { "filter": [{ "var": "tx" }, { ">": [{ "var": "item.amount" }, 50] }] } },
+        "root": {
+          "type": "card", "title": "Big spends",
+          "children": [
+            { "type": "list", "items": { "var": "big" }, "limit": 5,
+              "template": { "type": "row", "children": [
+                { "type": "text", "value": { "var": "item.merchant" } },
+                { "type": "text", "value": { "format": [{ "var": "item.amount" }, "currency"] }, "color": "negative" }
+              ] } }
+          ]
+        }
+      }
+    },
+    {
+      "name": "unknown component",
+      "valid": false,
+      "error": "unknown component",
+      "spec": { "specVersion": 1, "id": "w", "title": "T", "slot": "home.top", "root": { "type": "iframe", "src": "x" } }
+    },
+    {
+      "name": "unknown operator",
+      "valid": false,
+      "error": "unknown operator",
+      "spec": { "specVersion": 1, "id": "w", "title": "T", "slot": "home.top", "root": { "type": "text", "value": { "eval": ["alert(1)"] } } }
+    },
+    {
+      "name": "unknown slot",
+      "valid": false,
+      "error": "slot",
+      "spec": { "specVersion": 1, "id": "w", "title": "T", "slot": "nowhere", "root": { "type": "text", "value": "x" } }
+    },
+    {
+      "name": "unknown data source",
+      "valid": false,
+      "error": "unknown variable",
+      "spec": { "specVersion": 1, "id": "w", "title": "T", "slot": "home.top", "root": { "type": "text", "value": { "var": "orders.0.total" } } }
+    },
+    {
+      "name": "item outside iteration",
+      "valid": false,
+      "error": "unknown variable",
+      "spec": { "specVersion": 1, "id": "w", "title": "T", "slot": "home.top", "root": { "type": "text", "value": { "var": "item.name" } } }
+    },
+    {
+      "name": "binding forward reference",
+      "valid": false,
+      "error": "unknown variable",
+      "spec": { "specVersion": 1, "id": "w", "title": "T", "slot": "home.top",
+        "bindings": { "a": { "var": "b" }, "b": 1 },
+        "root": { "type": "text", "value": { "var": "a" } } }
+    },
+    {
+      "name": "future spec version",
+      "valid": false,
+      "error": "specVersion",
+      "spec": { "specVersion": 99, "id": "w", "title": "T", "slot": "home.top", "root": { "type": "text", "value": "x" } }
+    },
+    {
+      "name": "missing required prop",
+      "valid": false,
+      "error": "value",
+      "spec": { "specVersion": 1, "id": "w", "title": "T", "slot": "home.top", "root": { "type": "metric", "label": "x" } }
+    },
+    {
+      "name": "bad arity",
+      "valid": false,
+      "error": "arguments",
+      "spec": { "specVersion": 1, "id": "w", "title": "T", "slot": "home.top", "root": { "type": "text", "value": { "filter": [{ "var": "tx" }] } } }
+    },
+    {
+      "name": "bad color token",
+      "valid": false,
+      "error": "color",
+      "spec": { "specVersion": 1, "id": "w", "title": "T", "slot": "home.top", "root": { "type": "text", "value": "x", "color": "#ff0000" } }
+    },
+    {
+      "name": "list limit too high",
+      "valid": false,
+      "error": "limit",
+      "spec": { "specVersion": 1, "id": "w", "title": "T", "slot": "home.top", "root": { "type": "list", "items": { "var": "tx" }, "limit": 1000, "template": { "type": "text", "value": "x" } } }
+    },
+    {
+      "name": "too deep",
+      "valid": false,
+      "error": "depth",
+      "spec": { "specVersion": 1, "id": "w", "title": "T", "slot": "home.top", "root":
+        { "type": "column", "children": [ { "type": "column", "children": [ { "type": "column", "children": [ { "type": "column", "children": [
+        { "type": "column", "children": [ { "type": "column", "children": [ { "type": "column", "children": [ { "type": "column", "children": [
+        { "type": "column", "children": [ { "type": "column", "children": [ { "type": "column", "children": [ { "type": "column", "children": [
+        { "type": "text", "value": "deep" } ] } ] } ] } ] } ] } ] } ] } ] } ] } ] } ] } ] } }
+    }
+  ]
+}

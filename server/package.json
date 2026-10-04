@@ -1,0 +1,20 @@
+{
+  "name": "@graft/server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Reference Graft generator backend: turns user prompts into validated widget specs with Claude.",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "start": "node dist/index.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.131.0",
+    "@graft/core": "0.1.0"
+  },
+  "devDependencies": { "@types/node": "^22.0.0" },
+  "license": "MIT"
+}
