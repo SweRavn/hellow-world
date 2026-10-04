@@ -4,6 +4,7 @@ import type { GenerateRequest } from "./prompt.js";
 import { SPEC_VERSION, type DataSourceInfo, type Expr, type Json, type Manifest, type SlotInfo, type WidgetSpec } from "./types.js";
 import { validateSpec } from "./validate.js";
 import { initialState } from "./input.js";
+import { WidgetController, watchSlot, type SlotItem } from "./view.js";
 
 /** A piece of app data the host exposes to generated widgets. */
 export interface DataSource extends DataSourceInfo {
@@ -212,6 +213,16 @@ export class Graft {
       state,
       eval: (expr, scope) => evaluate(expr, { ...base, vars, ...(scope && { scope }) }),
     };
+  }
+
+  /** Headless controller for one widget: view tree + input getters/setters for any UI framework. */
+  controller(spec: WidgetSpec, data: Record<string, Json>, state?: Record<string, Json>): WidgetController {
+    return new WidgetController(this, spec, data, state);
+  }
+
+  /** Headless slot: reports the slot's widgets (each with a live controller) whenever they change. */
+  watchSlot(slotId: string, onItems: (items: SlotItem[]) => void): () => void {
+    return watchSlot(this, slotId, onItems);
   }
 
   dispose(): void {

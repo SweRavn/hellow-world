@@ -209,7 +209,7 @@ before render). Type mismatches at runtime yield `null`, never throw.
 `conformance/expressions.json` holds evaluation vectors
 (`{ name, data, expr, expect }`), `conformance/validation.json` holds specs
 that must be accepted or rejected, and `conformance/inputs.json` holds input
-coercion and select-option vectors. Every SDK runs them in its test suite;
+coercion and select-option vectors, and `conformance/views.json` holds view-tree vectors (§6). Every SDK runs them in its test suite;
 `format`/`now`/`startOf` are locale/clock dependent and are excluded from the
 shared vectors.
 
@@ -219,7 +219,41 @@ shared vectors.
 a higher version than they support (the generator is told the SDK's version in
 the request).
 
-## 6. Reserved: general code (future)
+## 6. Headless view tree
+
+SDKs don't require any particular UI toolkit. Their core evaluates a widget (spec + data snapshot +
+input state) into a **view tree** of plain, display-ready nodes, and the host renders it with whatever
+components it likes. The DOM, Compose and SwiftUI renderers shipped with Graft are optional adapters
+over this tree. Every SDK produces the same tree for the same input (`conformance/views.json`).
+
+Every node has `type` and `key` (its path in the spec, e.g. `root.0.1`, stable across recomputes:
+use it as the component key). Values are already evaluated and formatted:
+
+| type | fields |
+|---|---|
+| `card` | `title` (string or null), `children` |
+| `column` | `gap` (number or null), `children` |
+| `row` | `gap`, `align` (`start` default), `children` |
+| `text` | `text`, `style` (`body` default), `color` (token, `default` if invalid) |
+| `metric` | `label`, `value`, `caption` (null when empty), `color` |
+| `progress` | `label` (or null), `value` (0 default), `max` (1 default), `fraction` (0..1) |
+| `list` | `items` (the template resolved per element, up to `limit`), `empty` (text when there are no elements, else null) |
+| `barChart` | `bars`: `[{ label, value, fraction }]` |
+| `badge` | `text`, `color` |
+| `divider` | — |
+| `input` | `kind`, `name` (state entry), `label`, `placeholder`, `min`, `max`, `step` (null when unset), `multiline`, `options` (`[{label, value}]`, select only), `value` (**getter**), and `set(raw)` (**setter**) |
+
+`visible` produces no node: when its condition holds, its children are spliced into the parent;
+otherwise they are dropped. A root that expands to several nodes is wrapped in a `column` keyed `root`.
+
+Display text: `null` → `""`, numbers in shortest form (`2`, `2.5`), other values as JSON.
+
+An input's `set(raw)` takes the raw value from any control (a string from a text field, a number from a
+slider, a boolean from a switch, an option's `value`), coerces it (§2.4), updates the widget's state and
+recomputes the tree. A **widget controller** owns that state, accepts new data snapshots and notifies
+subscribers with each new tree; this is the hook a UI layer connects to.
+
+## 7. Reserved: general code (future)
 
 The formula language stays the default because it is safe and acceptable to the app stores. A future
 version will add an opt-in construct for running general code, for apps where that is acceptable

@@ -1,25 +1,13 @@
 import GraftCore
 import SwiftUI
 
-/// Renders a bound widget spec with native SwiftUI views.
-/// Renders a bound widget. Use `LiveWidgetView` for working inputs; here, input changes go to `onInput`.
-public struct WidgetView: View {
-    let widget: BoundWidget
-    let onInput: ((String, JSON) -> Void)?
+/*
+ Optional SwiftUI adapter over Graft's headless view tree (GraftCore's ViewNode and WidgetController).
+ Apps on UIKit or another design system render ViewNode with their own views instead.
+ */
 
-    public init(_ widget: BoundWidget, onInput: ((String, JSON) -> Void)? = nil) {
-        self.widget = widget
-        self.onInput = onInput
-    }
-
-    public var body: some View {
-        NodeView(widget: widget, node: widget.spec.root, scope: nil)
-            .environment(\.graftInput, onInput)
-    }
-}
-
-func tokenColor(_ v: JSON) -> Color? {
-    switch v.string {
+func tokenColor(_ token: String) -> Color? {
+    switch token {
     case "muted": return .secondary
     case "accent": return .accentColor
     case "positive": return .green
@@ -29,127 +17,80 @@ func tokenColor(_ v: JSON) -> Color? {
     }
 }
 
-func display(_ v: JSON) -> String {
-    switch v {
-    case .null: return ""
-    case .string(let s): return s
-    case .number(let n): return JSON.numberToString(n)
-    case .bool(let b): return b ? "true" : "false"
-    default: return v.serialized
-    }
-}
+/// Renders a headless view tree with native SwiftUI views.
+public struct GraftView: View {
+    let node: ViewNode
 
-struct NodeView: View {
-    let widget: BoundWidget
-    let node: JSONObject
-    let scope: ItemScope?
+    public init(_ node: ViewNode) { self.node = node }
 
-    private func ev(_ key: String) -> JSON { widget.eval(node[key], scope: scope) }
-    private var children: [JSONObject] { node["children"]?.array?.compactMap(\.object) ?? [] }
-    private var gap: CGFloat { CGFloat(node["gap"]?.number ?? 8) }
-
-    @ViewBuilder
-    private func kids() -> some View {
-        ForEach(Array(children.enumerated()), id: \.offset) { _, child in
-            NodeView(widget: widget, node: child, scope: scope)
-        }
-    }
-
-    var body: some View {
-        switch node["type"]?.string ?? "" {
-        case "card":
+    public var body: some View {
+        switch node {
+        case .card(_, let title, let children):
             VStack(alignment: .leading, spacing: 10) {
-                let title = ev("title")
-                if !title.isNull {
-                    Text(display(title)).font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
-                }
-                kids()
+                if let title { Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(.secondary) }
+                Children(nodes: children)
             }
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(RoundedRectangle(cornerRadius: 12).fill(Color(white: 0.5, opacity: 0.08)))
-        case "column":
-            VStack(alignment: .leading, spacing: gap) { kids() }
-        case "row":
-            HStack(spacing: gap) {
-                let align = node["align"]?.string
+        case .column(_, let gap, let children):
+            VStack(alignment: .leading, spacing: CGFloat(gap ?? 8)) { Children(nodes: children) }
+        case .row(_, let gap, let align, let children):
+            HStack(spacing: CGFloat(gap ?? 8)) {
                 if align == "center" || align == "end" { Spacer(minLength: 0) }
-                if align == "spaceBetween" {
-                    ForEach(Array(children.enumerated()), id: \.offset) { i, child in
-                        if i > 0 { Spacer(minLength: gap) }
-                        NodeView(widget: widget, node: child, scope: scope)
-                    }
-                } else {
-                    kids()
+                ForEach(Array(children.enumerated()), id: \.element.key) { i, child in
+                    if align == "spaceBetween", i > 0 { Spacer(minLength: CGFloat(gap ?? 8)) }
+                    GraftView(child)
                 }
-                if align == "center" || align == nil || align == "start" { Spacer(minLength: 0) }
+                if align == "center" || align == "start" { Spacer(minLength: 0) }
             }
-        case "text":
-            Text(display(ev("value")))
-                .font(node["style"]?.string == "title" ? .headline : node["style"]?.string == "caption" ? .caption : .body)
-                .foregroundStyle(tokenColor(ev("color")) ?? .primary)
-        case "metric":
+        case .text(_, let text, let style, let color):
+            Text(text)
+                .font(style == "title" ? .headline : style == "caption" ? .caption : .body)
+                .foregroundStyle(tokenColor(color) ?? .primary)
+        case .metric(_, let label, let value, let caption, let color):
             VStack(alignment: .leading, spacing: 2) {
-                Text(display(ev("label"))).font(.footnote).foregroundStyle(.secondary)
-                Text(display(ev("value"))).font(.title.bold()).monospacedDigit()
-                    .foregroundStyle(tokenColor(ev("color")) ?? .primary)
-                let caption = display(ev("caption"))
-                if !caption.isEmpty { Text(caption).font(.caption).foregroundStyle(.secondary) }
+                Text(label).font(.footnote).foregroundStyle(.secondary)
+                Text(value).font(.title.bold()).monospacedDigit().foregroundStyle(tokenColor(color) ?? .primary)
+                if let caption { Text(caption).font(.caption).foregroundStyle(.secondary) }
             }
-        case "progress":
-            let value = ev("value").number ?? 0
-            let max = ev("max").number ?? 1
+        case .progress(_, let label, let value, let max, let fraction):
             VStack(alignment: .leading, spacing: 4) {
-                let label = ev("label")
-                if !label.isNull { Text(display(label)).font(.footnote) }
-                ProgressView(value: Swift.max(0, Swift.min(value, max)), total: Swift.max(max, .leastNonzeroMagnitude))
-                    .tint(value > max ? .red : .accentColor)
+                if let label { Text(label).font(.footnote) }
+                ProgressView(value: fraction).tint(value > max ? .red : .accentColor)
             }
-        case "list":
-            let items = ev("items").array ?? []
-            let limit = Swift.min(Int(node["limit"]?.number ?? Double(Limits.maxListLimit)), Limits.maxListLimit)
+        case .list(_, let items, let empty):
             VStack(alignment: .leading, spacing: 6) {
-                if items.isEmpty, !ev("empty").isNull {
-                    Text(display(ev("empty"))).font(.footnote).foregroundStyle(.secondary)
-                }
-                if let template = node["template"]?.object {
-                    ForEach(Array(items.prefix(limit).enumerated()), id: \.offset) { i, item in
-                        NodeView(widget: widget, node: template, scope: ItemScope(item: item, index: i))
-                    }
-                }
+                if let empty { Text(empty).font(.footnote).foregroundStyle(.secondary) }
+                Children(nodes: items)
             }
-        case "barChart":
-            let rows = (ev("items").array ?? []).prefix(Limits.maxListLimit).map { item in
-                (label: display(item["label"] ?? .null), value: item["value"]?.number ?? 0)
-            }
-            let max = ev("max").number ?? rows.map(\.value).max() ?? 0
+        case .barChart(_, let bars):
             VStack(alignment: .leading, spacing: 6) {
-                ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                ForEach(Array(bars.enumerated()), id: \.offset) { _, bar in
                     HStack(spacing: 8) {
-                        Text(row.label).font(.footnote).lineLimit(1).frame(width: 96, alignment: .leading)
-                        ProgressView(value: max > 0 ? Swift.min(Swift.max(row.value / max, 0), 1) : 0)
-                        Text(JSON.numberToString((row.value * 100).rounded() / 100)).font(.footnote).foregroundStyle(.secondary).monospacedDigit()
+                        Text(bar.label).font(.footnote).lineLimit(1).frame(width: 96, alignment: .leading)
+                        ProgressView(value: bar.fraction)
+                        Text(displayText(.number((bar.value * 100).rounded() / 100))).font(.footnote).foregroundStyle(.secondary).monospacedDigit()
                     }
                 }
             }
-        case "badge":
-            let color = tokenColor(ev("color")) ?? .primary
-            Text(display(ev("value"))).font(.caption)
+        case .badge(_, let text, let color):
+            let c = tokenColor(color) ?? .primary
+            Text(text).font(.caption)
                 .padding(.horizontal, 8).padding(.vertical, 2)
-                .foregroundStyle(color)
-                .overlay(Capsule().stroke(color, lineWidth: 1))
-        case "divider":
+                .foregroundStyle(c)
+                .overlay(Capsule().stroke(c, lineWidth: 1))
+        case .divider:
             Divider()
-        case "input":
-            let label = ev("label"), placeholder = ev("placeholder")
-            InputView(widget: widget, node: node, label: label.isNull ? nil : display(label),
-                      placeholder: placeholder.isNull ? nil : display(placeholder), options: ev("options"))
-        case "visible":
-            if ev("when").truthy {
-                VStack(alignment: .leading, spacing: 8) { kids() }
-            }
-        default:
-            EmptyView() // unreachable for validated specs
+        case .input(let input):
+            InputControl(input: input)
         }
+    }
+}
+
+struct Children: View {
+    let nodes: [ViewNode]
+    var body: some View {
+        ForEach(nodes, id: \.key) { GraftView($0) }
     }
 }

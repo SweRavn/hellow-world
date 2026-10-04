@@ -90,4 +90,19 @@ class GraftTest {
         val typed = Inputs.coerce("number", JsonPrimitive("1,5"))
         assertEquals(5.5, J.num(g.bind(s, data, g.bind(s, data).state + ("a" to typed)).eval(sum)))
     }
+
+    @Test
+    fun controllerSettersRecompute() = runTest {
+        val calc = Json.parseToJsonElement(
+            """{"specVersion":1,"id":"calc","title":"Calc","slot":"home.top","state":{"a":null,"b":2},
+                "root":{"type":"column","children":[{"type":"input","kind":"number","bind":"a"},
+                  {"type":"input","kind":"number","bind":"b"},{"type":"metric","label":"Sum","value":{"+":[{"var":"state.a"},{"var":"state.b"}]}}]}}""",
+        )
+        val g = graft({ calc })
+        val c = g.controller(g.propose("calc"), g.snapshot())
+        fun root() = c.view.value as ViewNode.Column
+        (root().children[0] as ViewNode.Input).set("1,5") // raw text from any UI control
+        assertEquals(J.of(1.5), (root().children[0] as ViewNode.Input).value)
+        assertEquals("3.5", (root().children[2] as ViewNode.Metric).value)
+    }
 }

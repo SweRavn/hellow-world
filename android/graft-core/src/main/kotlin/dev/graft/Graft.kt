@@ -186,6 +186,10 @@ class Graft(
         return slots[slot]?.maxWidgets?.let { list.takeLast(it) } ?: list
     }
 
+    /** Headless controller for one widget: view tree + input getters/setters for any UI toolkit. */
+    fun controller(spec: WidgetSpec, data: Map<String, JsonElement>, state: Map<String, JsonElement> = Inputs.initialState(spec)) =
+        WidgetController(this, spec, data, state)
+
     suspend fun snapshot(): Map<String, JsonElement> = sources.mapValues { (_, s) -> s.get() }
 
     /**

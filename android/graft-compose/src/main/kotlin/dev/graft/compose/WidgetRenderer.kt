@@ -1,5 +1,6 @@
 package dev.graft.compose
 
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -8,43 +9,40 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.border
 import androidx.compose.material3.Card
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.staticCompositionLocalOf
-import dev.graft.BoundWidget
 import dev.graft.Graft
-import dev.graft.Inputs
+import dev.graft.displayText
+import dev.graft.ViewNode
 import dev.graft.WidgetSpec
-import dev.graft.ItemScope
-import dev.graft.Limits
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.doubleOrNull
+
+/*
+ * Optional Jetpack Compose adapter over Graft's headless view tree (graft-core's ViewNode and
+ * WidgetController). Apps on another toolkit render ViewNode with their own components instead.
+ */
 
 /** Semantic color tokens → Material 3 colors, so widgets follow the host theme. */
 @Composable
-internal fun tokenColor(v: JsonElement): Color {
+internal fun tokenColor(token: String): Color {
     val c = MaterialTheme.colorScheme
-    return when ((v as? JsonPrimitive)?.takeIf { it.isString }?.content) {
+    return when (token) {
         "muted" -> c.onSurfaceVariant
         "accent" -> c.primary
         "positive" -> Color(0xFF15803D)
@@ -54,72 +52,42 @@ internal fun tokenColor(v: JsonElement): Color {
     }
 }
 
-internal fun str(v: JsonElement): String = when {
-    v is JsonNull -> ""
-    v is JsonPrimitive && v.isString -> v.content
-    v is JsonPrimitive -> v.doubleOrNull?.let { d -> if (d == Math.rint(d) && kotlin.math.abs(d) < 1e15) d.toLong().toString() else d.toString() } ?: v.content
-    else -> v.toString()
-}
-
-private fun num(v: JsonElement): Double? = (v as? JsonPrimitive)?.takeIf { !it.isString }?.doubleOrNull?.takeIf { it.isFinite() }
-
-private fun truthy(v: JsonElement): Boolean = when {
-    v is JsonNull -> false
-    v is JsonArray -> v.isNotEmpty()
-    v is JsonPrimitive && v.isString -> v.content.isNotEmpty()
-    v is JsonPrimitive -> v.content != "false" && num(v) != 0.0
-    else -> true
-}
-
-/** Receives (state name, coerced value) when the user changes an input; null renders inputs read-only. */
-internal val LocalInputHandler = staticCompositionLocalOf<((String, JsonElement) -> Unit)?> { null }
-
 /**
- * Renders a bound widget spec with Material 3 components. Use [LiveWidget] to get working inputs;
- * this lower-level entry point reports input changes through [onInput].
- */
-@Composable
-fun RenderWidget(widget: BoundWidget, modifier: Modifier = Modifier, onInput: ((String, JsonElement) -> Unit)? = null) {
-    CompositionLocalProvider(LocalInputHandler provides onInput) {
-        Box(modifier) { Node(widget, widget.spec.root, null) }
-    }
-}
-
-/**
- * Renders a widget spec against a data snapshot and owns its input state: formulas recompute as the
- * user types. State is kept while [spec] stays the same and resets when it changes (e.g. after an edit).
+ * Renders a widget spec against a data snapshot through a [dev.graft.WidgetController], which owns the
+ * input state. State is kept while [spec] stays the same and resets when it changes (e.g. after an edit).
  */
 @Composable
 fun LiveWidget(graft: Graft, spec: WidgetSpec, data: Map<String, JsonElement>, modifier: Modifier = Modifier) {
-    var state by remember(spec) { mutableStateOf(Inputs.initialState(spec)) }
-    val bound = remember(spec, data, state) { runCatching { graft.bind(spec, data, state) }.getOrNull() }
-    if (bound != null) {
-        RenderWidget(bound, modifier, onInput = { name, value -> state = state + (name to value) })
-    } else {
-        Text("“${spec.title}” could not be shown.", modifier, color = MaterialTheme.colorScheme.error)
-    }
+    val controller = remember(spec) { graft.controller(spec, data) }
+    LaunchedEffect(controller, data) { controller.setData(data) }
+    val view by controller.view.collectAsState()
+    val current = view
+    if (current != null) GraftView(current, modifier)
+    else Text("“${spec.title}” could not be shown.", modifier, color = MaterialTheme.colorScheme.error)
+}
+
+/** Renders a headless view tree with Material 3 components. */
+@Composable
+fun GraftView(node: ViewNode, modifier: Modifier = Modifier) {
+    Box(modifier) { Node(node) }
 }
 
 @Composable
-private fun Node(w: BoundWidget, n: JsonObject, scope: ItemScope?) {
-    // Expression errors (e.g. step budget) degrade to an empty value instead of crashing composition.
-    fun ev(key: String): JsonElement = runCatching { w.eval(n[key], scope) }.getOrDefault(JsonNull)
-    val children = (n["children"] as? JsonArray)?.mapNotNull { it as? JsonObject } ?: emptyList()
-    val gap = num(n["gap"] ?: JsonNull)?.dp ?: 8.dp
+private fun Children(nodes: List<ViewNode>) = nodes.forEach { key(it.key) { Node(it) } }
 
-    when ((n["type"] as JsonPrimitive).content) {
-        "card" -> Card(Modifier.fillMaxWidth()) {
+@Composable
+private fun Node(n: ViewNode) {
+    when (n) {
+        is ViewNode.Card -> Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                val title = ev("title")
-                if (title !is JsonNull) {
-                    Text(str(title), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                children.forEach { Node(w, it, scope) }
+                n.title?.let { Text(it, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                Children(n.children)
             }
         }
-        "column" -> Column(verticalArrangement = Arrangement.spacedBy(gap)) { children.forEach { Node(w, it, scope) } }
-        "row" -> {
-            val arrangement = when ((n["align"] as? JsonPrimitive)?.content) {
+        is ViewNode.Column -> Column(verticalArrangement = Arrangement.spacedBy((n.gap ?: 8.0).dp)) { Children(n.children) }
+        is ViewNode.Row -> {
+            val gap = (n.gap ?: 8.0).dp
+            val arrangement = when (n.align) {
                 "center" -> Arrangement.spacedBy(gap, Alignment.CenterHorizontally)
                 "end" -> Arrangement.spacedBy(gap, Alignment.End)
                 "spaceBetween" -> Arrangement.SpaceBetween
@@ -127,79 +95,56 @@ private fun Node(w: BoundWidget, n: JsonObject, scope: ItemScope?) {
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = arrangement, verticalAlignment = Alignment.CenterVertically) {
                 // Inputs share the row's width; other children keep their natural size.
-                children.forEach { c ->
-                    if ((c["type"] as? JsonPrimitive)?.content == "input") Box(Modifier.weight(1f)) { Node(w, c, scope) }
-                    else Node(w, c, scope)
+                n.children.forEach { c ->
+                    key(c.key) { if (c is ViewNode.Input) Box(Modifier.weight(1f)) { Node(c) } else Node(c) }
                 }
             }
         }
-        "text" -> {
-            val style = when ((n["style"] as? JsonPrimitive)?.content) {
+        is ViewNode.Text -> Text(
+            n.text,
+            style = when (n.style) {
                 "title" -> MaterialTheme.typography.titleMedium
                 "caption" -> MaterialTheme.typography.bodySmall
                 else -> MaterialTheme.typography.bodyMedium
-            }
-            Text(str(ev("value")), style = style, color = tokenColor(ev("color")))
+            },
+            color = tokenColor(n.color),
+        )
+        is ViewNode.Metric -> Column {
+            Text(n.label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(n.value, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = tokenColor(n.color))
+            n.caption?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
-        "metric" -> Column {
-            Text(str(ev("label")), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(str(ev("value")), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = tokenColor(ev("color")))
-            val caption = ev("caption")
-            if (caption !is JsonNull && str(caption).isNotEmpty()) {
-                Text(str(caption), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-        "progress" -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            val label = ev("label")
-            if (label !is JsonNull) Text(str(label), style = MaterialTheme.typography.bodySmall)
-            val value = num(ev("value")) ?: 0.0
-            val max = num(ev("max")) ?: 1.0
-            val fraction = if (max > 0) (value / max).coerceIn(0.0, 1.0).toFloat() else 0f
+        is ViewNode.Progress -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            n.label?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
             LinearProgressIndicator(
-                progress = { fraction },
+                progress = { n.fraction.toFloat() },
                 modifier = Modifier.fillMaxWidth(),
-                color = if (value > max) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                color = if (n.value > n.max) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
             )
         }
-        "list" -> Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            val items = ev("items") as? JsonArray ?: JsonArray(emptyList())
-            val limit = minOf(num(n["limit"] ?: JsonNull)?.toInt() ?: Limits.MAX_LIST_LIMIT, Limits.MAX_LIST_LIMIT)
-            if (items.isEmpty()) {
-                val empty = ev("empty")
-                if (empty !is JsonNull) Text(str(empty), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            val template = n["template"] as? JsonObject
-            if (template != null) items.take(limit).forEachIndexed { i, item -> Node(w, template, ItemScope(item, i)) }
+        is ViewNode.ListNode -> Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            n.empty?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            Children(n.items)
         }
-        "barChart" -> Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            val rows = ((ev("items") as? JsonArray) ?: JsonArray(emptyList())).take(Limits.MAX_LIST_LIMIT).map {
-                val o = it as? JsonObject
-                str(o?.get("label") ?: JsonNull) to (num(o?.get("value") ?: JsonNull) ?: 0.0)
-            }
-            val max = num(ev("max")) ?: (rows.maxOfOrNull { it.second } ?: 0.0)
-            rows.forEach { (label, value) ->
+        is ViewNode.BarChart -> Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            n.bars.forEach { b ->
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(label, Modifier.width(96.dp), maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall)
-                    LinearProgressIndicator(
-                        progress = { if (max > 0) (value / max).coerceIn(0.0, 1.0).toFloat() else 0f },
-                        modifier = Modifier.weight(1f),
-                    )
-                    Text(str(JsonPrimitive(Math.round(value * 100) / 100.0)), style = MaterialTheme.typography.bodySmall)
+                    Text(b.label, Modifier.width(96.dp), maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall)
+                    LinearProgressIndicator(progress = { b.fraction.toFloat() }, modifier = Modifier.weight(1f))
+                    Text(displayText(JsonPrimitive(Math.round(b.value * 100) / 100.0)), style = MaterialTheme.typography.bodySmall)
                 }
             }
         }
-        "badge" -> {
-            val color = tokenColor(ev("color")).takeIf { it != Color.Unspecified } ?: MaterialTheme.colorScheme.onSurface
+        is ViewNode.Badge -> {
+            val color = tokenColor(n.color).takeIf { it != Color.Unspecified } ?: MaterialTheme.colorScheme.onSurface
             Text(
-                str(ev("value")),
+                n.text,
                 color = color,
                 style = MaterialTheme.typography.labelSmall,
                 modifier = Modifier.border(1.dp, color, RoundedCornerShape(50)).padding(horizontal = 8.dp, vertical = 2.dp),
             )
         }
-        "divider" -> HorizontalDivider()
-        "input" -> InputNode(w, n, ev("label").takeIf { it !is JsonNull }?.let(::str), ev("placeholder").takeIf { it !is JsonNull }?.let(::str)) { ev("options") }
-        "visible" -> if (truthy(ev("when"))) Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { children.forEach { Node(w, it, scope) } }
-        else -> Unit // unreachable for validated specs
+        is ViewNode.Divider -> HorizontalDivider()
+        is ViewNode.Input -> InputControl(n)
     }
 }

@@ -1,5 +1,5 @@
-import { EvalError, initialState, type Graft, type Json, type WidgetSpec } from "@graft/core";
-import { renderWidget } from "./render.js";
+import type { Graft, Json, SlotItem, WidgetController, WidgetSpec } from "@graft/core";
+import { renderView } from "./render.js";
 import { injectStyles } from "./styles.js";
 import { openVibePanel, type VibePanelOptions } from "./panel.js";
 
@@ -9,28 +9,14 @@ export interface SlotOptions {
   panel?: Omit<VibePanelOptions, "slot" | "edit">;
 }
 
-/** A rendered widget that owns its input state and recomputes as the user types or data changes. */
-export interface LiveWidget {
-  readonly element: HTMLElement;
-  readonly state: Record<string, Json>;
-  setData(data: Record<string, Json>): void;
-}
-
 /**
- * Renders a widget spec into a self-contained element. Inputs update the widget's state and every
- * formula is recomputed immediately; failures show an error placeholder instead of throwing.
+ * Mounts a headless widget controller into a DOM element and re-renders it on every change, keeping
+ * input focus and cursor. Returns the element and an unmount function.
  */
-export function createLiveWidget(
-  graft: Graft,
-  spec: WidgetSpec,
-  data: Record<string, Json>,
-  options: { state?: Record<string, Json>; onState?(state: Record<string, Json>): void } = {},
-): LiveWidget {
+export function mountController(controller: WidgetController): { element: HTMLElement; unmount(): void } {
   const element = document.createElement("div");
   element.className = "graft-live";
   const controls = new Map<string, HTMLElement>();
-  let state = options.state ?? initialState(spec);
-  let current = data;
 
   const render = () => {
     const doc = element.ownerDocument;
@@ -41,15 +27,14 @@ export function createLiveWidget(
     } catch {
       /* not a text control */
     }
-    let tree: HTMLElement;
-    try {
-      tree = renderWidget(graft.bind(spec, current, state), { controls, onInput });
-    } catch (e) {
-      tree = doc.createElement("div");
-      tree.className = "graft-error";
-      tree.textContent = `“${spec.title}” could not be shown${e instanceof EvalError ? " (too much data to compute)" : ""}.`;
+    const view = controller.view;
+    if (view) element.replaceChildren(renderView(view, { controls }));
+    else {
+      const box = doc.createElement("div");
+      box.className = "graft-error";
+      box.textContent = `“${controller.spec.title}” could not be shown (${controller.error}).`;
+      element.replaceChildren(box);
     }
-    element.replaceChildren(tree);
     // Reused controls were moved into the new tree, which blurs them: restore focus and cursor.
     if (active && active !== doc.activeElement && element.contains(active)) {
       active.focus({ preventScroll: true });
@@ -61,28 +46,14 @@ export function createLiveWidget(
     }
   };
 
-  const onInput = (name: string, value: Json) => {
-    state = { ...state, [name]: value };
-    options.onState?.(state);
-    render();
-  };
-
+  const off = controller.subscribe(render);
   render();
-  return {
-    element,
-    get state() {
-      return state;
-    },
-    setData(d) {
-      current = d;
-      render();
-    },
-  };
+  return { element, unmount: off };
 }
 
 /** Renders one widget spec into a self-contained, interactive element. */
 export function renderSpec(graft: Graft, spec: WidgetSpec, data: Record<string, Json>): HTMLElement {
-  return createLiveWidget(graft, spec, data).element;
+  return mountController(graft.controller(spec, data)).element;
 }
 
 /**
@@ -93,36 +64,28 @@ export function mountSlot(graft: Graft, host: HTMLElement, slotId: string, opts:
   injectStyles(host.ownerDocument);
   host.classList.add("graft-root", "graft-slot");
   host.dataset.graftSlot = slotId;
-  let version = 0;
-  // Live widgets by id. Reusing them across redraws keeps input state, focus and cursor
-  // when data changes; an edited spec (new object) starts fresh.
-  let live = new Map<string, { spec: WidgetSpec; widget: LiveWidget; wrap: HTMLElement }>();
+  // DOM per controller: watchSlot reuses controllers across data changes, so elements (and the
+  // user's focus and input state) survive; an edited widget gets a new controller and element.
+  let mounted = new Map<WidgetController, { wrap: HTMLElement; unmount(): void }>();
 
-  const draw = async () => {
-    const v = ++version;
-    const widgets = graft.widgets(slotId);
-    const data = widgets.length ? await graft.snapshot() : {};
-    if (v !== version) return; // a newer render started while we awaited data
-    const next = new Map<string, { spec: WidgetSpec; widget: LiveWidget; wrap: HTMLElement }>();
-    for (const spec of widgets) {
-      const prev = live.get(spec.id);
-      if (prev && prev.spec === spec) {
-        prev.widget.setData(data);
-        next.set(spec.id, prev);
-        continue;
+  const draw = (items: SlotItem[]) => {
+    const next = new Map<WidgetController, { wrap: HTMLElement; unmount(): void }>();
+    for (const { spec, controller } of items) {
+      let m = mounted.get(controller);
+      if (!m) {
+        const { element, unmount } = mountController(controller);
+        const wrap = document.createElement("div");
+        wrap.className = "graft-widget";
+        wrap.dataset.graftWidget = spec.id;
+        wrap.appendChild(element);
+        if (opts.editable !== false) wrap.appendChild(menu(spec));
+        m = { wrap, unmount };
       }
-      const widget = createLiveWidget(graft, spec, data);
-      const wrap = document.createElement("div");
-      wrap.className = "graft-widget";
-      wrap.dataset.graftWidget = spec.id;
-      wrap.appendChild(widget.element);
-      if (opts.editable !== false) wrap.appendChild(menu(spec));
-      next.set(spec.id, { spec, widget, wrap });
+      next.set(controller, m);
     }
-    live = next;
-    // Only touch the DOM when the set or order of widgets changed, so focused inputs stay put.
-    const wraps = [...next.values()].map((x) => x.wrap);
-    if (wraps.length !== host.children.length || wraps.some((w, i) => host.children[i] !== w)) host.replaceChildren(...wraps);
+    mounted.forEach((m, c) => next.has(c) || m.unmount());
+    mounted = next;
+    host.replaceChildren(...[...next.values()].map((m) => m.wrap));
   };
 
   const menu = (spec: WidgetSpec) => {
@@ -145,12 +108,11 @@ export function mountSlot(graft: Graft, host: HTMLElement, slotId: string, opts:
     return m;
   };
 
-  const off = graft.onChange(() => void draw());
-  void draw();
+  const stop = graft.watchSlot(slotId, draw);
   return () => {
-    off();
-    version++;
-    live.clear();
+    stop();
+    mounted.forEach((m) => m.unmount());
+    mounted.clear();
     host.replaceChildren();
   };
 }

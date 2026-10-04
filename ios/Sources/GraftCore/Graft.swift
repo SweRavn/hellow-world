@@ -230,7 +230,7 @@ public final class Graft: ObservableObject {
 
     /// Resolves bindings against a data snapshot and the widget's input `state` (defaults to its initial
     /// values). Throws `EvalError` if the budget is exceeded.
-    public func bind(_ spec: WidgetSpec, data: [String: JSON], state: [String: JSON]? = nil) throws -> BoundWidget {
+    nonisolated public func bind(_ spec: WidgetSpec, data: [String: JSON], state: [String: JSON]? = nil) throws -> BoundWidget {
         let state = state ?? Inputs.initialState(spec)
         var scope = data
         if spec.state != nil {
