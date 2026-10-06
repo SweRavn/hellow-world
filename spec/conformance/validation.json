@@ -1,32 +1,105 @@
 {
   "manifest": {
-    "app": { "name": "Test app" },
-    "dataSources": {
-      "tx": { "description": "transactions", "schema": { "type": "array", "items": { "type": "object" } } },
-      "user": { "description": "the user", "schema": { "type": "object" } }
+    "app": {
+      "name": "Test app"
     },
-    "slots": { "home.top": { "description": "top of home" } }
+    "dataSources": {
+      "tx": {
+        "description": "transactions",
+        "schema": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      },
+      "user": {
+        "description": "the user",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    "slots": {
+      "home.top": {
+        "description": "top of home"
+      }
+    }
   },
   "cases": [
     {
       "name": "minimal valid",
       "valid": true,
-      "spec": { "specVersion": 1, "id": "w1", "title": "T", "slot": "home.top", "root": { "type": "text", "value": "hello" } }
+      "spec": {
+        "specVersion": 1,
+        "id": "w1",
+        "title": "T",
+        "slot": "home.top",
+        "root": {
+          "type": "text",
+          "value": "hello"
+        }
+      }
     },
     {
       "name": "valid with bindings and list",
       "valid": true,
       "spec": {
-        "specVersion": 1, "id": "w2", "title": "T", "slot": "home.top",
-        "bindings": { "big": { "filter": [{ "var": "tx" }, { ">": [{ "var": "item.amount" }, 50] }] } },
+        "specVersion": 1,
+        "id": "w2",
+        "title": "T",
+        "slot": "home.top",
+        "bindings": {
+          "big": {
+            "filter": [
+              {
+                "var": "tx"
+              },
+              {
+                ">": [
+                  {
+                    "var": "item.amount"
+                  },
+                  50
+                ]
+              }
+            ]
+          }
+        },
         "root": {
-          "type": "card", "title": "Big spends",
+          "type": "card",
+          "title": "Big spends",
           "children": [
-            { "type": "list", "items": { "var": "big" }, "limit": 5,
-              "template": { "type": "row", "children": [
-                { "type": "text", "value": { "var": "item.merchant" } },
-                { "type": "text", "value": { "format": [{ "var": "item.amount" }, "currency"] }, "color": "negative" }
-              ] } }
+            {
+              "type": "list",
+              "items": {
+                "var": "big"
+              },
+              "limit": 5,
+              "template": {
+                "type": "row",
+                "children": [
+                  {
+                    "type": "text",
+                    "value": {
+                      "var": "item.merchant"
+                    }
+                  },
+                  {
+                    "type": "text",
+                    "value": {
+                      "format": [
+                        {
+                          "var": "item.amount"
+                        },
+                        "currency"
+                      ]
+                    },
+                    "color": "negative"
+                  }
+                ]
+              }
+            }
           ]
         }
       }
@@ -35,79 +108,649 @@
       "name": "unknown component",
       "valid": false,
       "error": "unknown component",
-      "spec": { "specVersion": 1, "id": "w", "title": "T", "slot": "home.top", "root": { "type": "iframe", "src": "x" } }
+      "spec": {
+        "specVersion": 1,
+        "id": "w",
+        "title": "T",
+        "slot": "home.top",
+        "root": {
+          "type": "iframe",
+          "src": "x"
+        }
+      }
     },
     {
       "name": "unknown operator",
       "valid": false,
       "error": "unknown operator",
-      "spec": { "specVersion": 1, "id": "w", "title": "T", "slot": "home.top", "root": { "type": "text", "value": { "eval": ["alert(1)"] } } }
+      "spec": {
+        "specVersion": 1,
+        "id": "w",
+        "title": "T",
+        "slot": "home.top",
+        "root": {
+          "type": "text",
+          "value": {
+            "eval": [
+              "alert(1)"
+            ]
+          }
+        }
+      }
     },
     {
       "name": "unknown slot",
       "valid": false,
       "error": "slot",
-      "spec": { "specVersion": 1, "id": "w", "title": "T", "slot": "nowhere", "root": { "type": "text", "value": "x" } }
+      "spec": {
+        "specVersion": 1,
+        "id": "w",
+        "title": "T",
+        "slot": "nowhere",
+        "root": {
+          "type": "text",
+          "value": "x"
+        }
+      }
     },
     {
       "name": "unknown data source",
       "valid": false,
       "error": "unknown variable",
-      "spec": { "specVersion": 1, "id": "w", "title": "T", "slot": "home.top", "root": { "type": "text", "value": { "var": "orders.0.total" } } }
+      "spec": {
+        "specVersion": 1,
+        "id": "w",
+        "title": "T",
+        "slot": "home.top",
+        "root": {
+          "type": "text",
+          "value": {
+            "var": "orders.0.total"
+          }
+        }
+      }
     },
     {
       "name": "item outside iteration",
       "valid": false,
       "error": "unknown variable",
-      "spec": { "specVersion": 1, "id": "w", "title": "T", "slot": "home.top", "root": { "type": "text", "value": { "var": "item.name" } } }
+      "spec": {
+        "specVersion": 1,
+        "id": "w",
+        "title": "T",
+        "slot": "home.top",
+        "root": {
+          "type": "text",
+          "value": {
+            "var": "item.name"
+          }
+        }
+      }
     },
     {
       "name": "binding forward reference",
       "valid": false,
       "error": "unknown variable",
-      "spec": { "specVersion": 1, "id": "w", "title": "T", "slot": "home.top",
-        "bindings": { "a": { "var": "b" }, "b": 1 },
-        "root": { "type": "text", "value": { "var": "a" } } }
+      "spec": {
+        "specVersion": 1,
+        "id": "w",
+        "title": "T",
+        "slot": "home.top",
+        "bindings": {
+          "a": {
+            "var": "b"
+          },
+          "b": 1
+        },
+        "root": {
+          "type": "text",
+          "value": {
+            "var": "a"
+          }
+        }
+      }
     },
     {
       "name": "future spec version",
       "valid": false,
       "error": "specVersion",
-      "spec": { "specVersion": 99, "id": "w", "title": "T", "slot": "home.top", "root": { "type": "text", "value": "x" } }
+      "spec": {
+        "specVersion": 99,
+        "id": "w",
+        "title": "T",
+        "slot": "home.top",
+        "root": {
+          "type": "text",
+          "value": "x"
+        }
+      }
     },
     {
       "name": "missing required prop",
       "valid": false,
       "error": "value",
-      "spec": { "specVersion": 1, "id": "w", "title": "T", "slot": "home.top", "root": { "type": "metric", "label": "x" } }
+      "spec": {
+        "specVersion": 1,
+        "id": "w",
+        "title": "T",
+        "slot": "home.top",
+        "root": {
+          "type": "metric",
+          "label": "x"
+        }
+      }
     },
     {
       "name": "bad arity",
       "valid": false,
       "error": "arguments",
-      "spec": { "specVersion": 1, "id": "w", "title": "T", "slot": "home.top", "root": { "type": "text", "value": { "filter": [{ "var": "tx" }] } } }
+      "spec": {
+        "specVersion": 1,
+        "id": "w",
+        "title": "T",
+        "slot": "home.top",
+        "root": {
+          "type": "text",
+          "value": {
+            "filter": [
+              {
+                "var": "tx"
+              }
+            ]
+          }
+        }
+      }
     },
     {
       "name": "bad color token",
       "valid": false,
       "error": "color",
-      "spec": { "specVersion": 1, "id": "w", "title": "T", "slot": "home.top", "root": { "type": "text", "value": "x", "color": "#ff0000" } }
+      "spec": {
+        "specVersion": 1,
+        "id": "w",
+        "title": "T",
+        "slot": "home.top",
+        "root": {
+          "type": "text",
+          "value": "x",
+          "color": "#ff0000"
+        }
+      }
     },
     {
       "name": "list limit too high",
       "valid": false,
       "error": "limit",
-      "spec": { "specVersion": 1, "id": "w", "title": "T", "slot": "home.top", "root": { "type": "list", "items": { "var": "tx" }, "limit": 1000, "template": { "type": "text", "value": "x" } } }
+      "spec": {
+        "specVersion": 1,
+        "id": "w",
+        "title": "T",
+        "slot": "home.top",
+        "root": {
+          "type": "list",
+          "items": {
+            "var": "tx"
+          },
+          "limit": 1000,
+          "template": {
+            "type": "text",
+            "value": "x"
+          }
+        }
+      }
     },
     {
       "name": "too deep",
       "valid": false,
       "error": "depth",
-      "spec": { "specVersion": 1, "id": "w", "title": "T", "slot": "home.top", "root":
-        { "type": "column", "children": [ { "type": "column", "children": [ { "type": "column", "children": [ { "type": "column", "children": [
-        { "type": "column", "children": [ { "type": "column", "children": [ { "type": "column", "children": [ { "type": "column", "children": [
-        { "type": "column", "children": [ { "type": "column", "children": [ { "type": "column", "children": [ { "type": "column", "children": [
-        { "type": "text", "value": "deep" } ] } ] } ] } ] } ] } ] } ] } ] } ] } ] } ] } ] } }
+      "spec": {
+        "specVersion": 1,
+        "id": "w",
+        "title": "T",
+        "slot": "home.top",
+        "root": {
+          "type": "column",
+          "children": [
+            {
+              "type": "column",
+              "children": [
+                {
+                  "type": "column",
+                  "children": [
+                    {
+                      "type": "column",
+                      "children": [
+                        {
+                          "type": "column",
+                          "children": [
+                            {
+                              "type": "column",
+                              "children": [
+                                {
+                                  "type": "column",
+                                  "children": [
+                                    {
+                                      "type": "column",
+                                      "children": [
+                                        {
+                                          "type": "column",
+                                          "children": [
+                                            {
+                                              "type": "column",
+                                              "children": [
+                                                {
+                                                  "type": "column",
+                                                  "children": [
+                                                    {
+                                                      "type": "column",
+                                                      "children": [
+                                                        {
+                                                          "type": "text",
+                                                          "value": "deep"
+                                                        }
+                                                      ]
+                                                    }
+                                                  ]
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "input: add two numbers",
+      "valid": true,
+      "spec": {
+        "specVersion": 1,
+        "id": "w",
+        "title": "T",
+        "slot": "home.top",
+        "state": {
+          "a": null,
+          "b": null
+        },
+        "root": {
+          "type": "card",
+          "children": [
+            {
+              "type": "input",
+              "kind": "number",
+              "bind": "a",
+              "label": "First number"
+            },
+            {
+              "type": "input",
+              "kind": "number",
+              "bind": "b",
+              "label": "Second number"
+            },
+            {
+              "type": "metric",
+              "label": "Sum",
+              "value": {
+                "+": [
+                  {
+                    "var": "state.a"
+                  },
+                  {
+                    "var": "state.b"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "input: every kind",
+      "valid": true,
+      "spec": {
+        "specVersion": 1,
+        "id": "w",
+        "title": "T",
+        "slot": "home.top",
+        "state": {
+          "name": "",
+          "amount": 10,
+          "people": 2,
+          "tip": true,
+          "category": "Food",
+          "day": "2026-10-04",
+          "notes": null
+        },
+        "root": {
+          "type": "column",
+          "children": [
+            {
+              "type": "input",
+              "kind": "text",
+              "bind": "name",
+              "placeholder": "Name"
+            },
+            {
+              "type": "input",
+              "kind": "text",
+              "bind": "notes",
+              "multiline": true
+            },
+            {
+              "type": "input",
+              "kind": "number",
+              "bind": "amount",
+              "min": -100,
+              "step": 0.5
+            },
+            {
+              "type": "input",
+              "kind": "slider",
+              "bind": "people",
+              "min": 1,
+              "max": 10,
+              "step": 1
+            },
+            {
+              "type": "input",
+              "kind": "toggle",
+              "bind": "tip",
+              "label": "Add tip"
+            },
+            {
+              "type": "input",
+              "kind": "select",
+              "bind": "category",
+              "options": {
+                "pluck": [
+                  {
+                    "var": "tx"
+                  },
+                  "category"
+                ]
+              }
+            },
+            {
+              "type": "input",
+              "kind": "date",
+              "bind": "day"
+            },
+            {
+              "type": "text",
+              "value": {
+                "if": [
+                  {
+                    "var": "state.tip"
+                  },
+                  "tip",
+                  "no tip"
+                ]
+              }
+            }
+          ]
+        },
+        "bindings": {
+          "perPerson": {
+            "/": [
+              {
+                "var": "state.amount"
+              },
+              {
+                "var": "state.people"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "input: bind to undeclared state",
+      "valid": false,
+      "error": "declared state",
+      "spec": {
+        "specVersion": 1,
+        "id": "w",
+        "title": "T",
+        "slot": "home.top",
+        "state": {
+          "a": 0
+        },
+        "root": {
+          "type": "input",
+          "kind": "number",
+          "bind": "b"
+        }
+      }
+    },
+    {
+      "name": "input: no state object",
+      "valid": false,
+      "error": "declared state",
+      "spec": {
+        "specVersion": 1,
+        "id": "w",
+        "title": "T",
+        "slot": "home.top",
+        "root": {
+          "type": "input",
+          "kind": "number",
+          "bind": "a"
+        }
+      }
+    },
+    {
+      "name": "input: state var without state",
+      "valid": false,
+      "error": "unknown variable",
+      "spec": {
+        "specVersion": 1,
+        "id": "w",
+        "title": "T",
+        "slot": "home.top",
+        "root": {
+          "type": "text",
+          "value": {
+            "var": "state.a"
+          }
+        }
+      }
+    },
+    {
+      "name": "input: select needs options",
+      "valid": false,
+      "error": "options",
+      "spec": {
+        "specVersion": 1,
+        "id": "w",
+        "title": "T",
+        "slot": "home.top",
+        "state": {
+          "c": null
+        },
+        "root": {
+          "type": "input",
+          "kind": "select",
+          "bind": "c"
+        }
+      }
+    },
+    {
+      "name": "input: slider needs min and max",
+      "valid": false,
+      "error": "min and max",
+      "spec": {
+        "specVersion": 1,
+        "id": "w",
+        "title": "T",
+        "slot": "home.top",
+        "state": {
+          "p": 1
+        },
+        "root": {
+          "type": "input",
+          "kind": "slider",
+          "bind": "p",
+          "max": 5
+        }
+      }
+    },
+    {
+      "name": "input: min above max",
+      "valid": false,
+      "error": "min must be",
+      "spec": {
+        "specVersion": 1,
+        "id": "w",
+        "title": "T",
+        "slot": "home.top",
+        "state": {
+          "p": 1
+        },
+        "root": {
+          "type": "input",
+          "kind": "number",
+          "bind": "p",
+          "min": 5,
+          "max": 1
+        }
+      }
+    },
+    {
+      "name": "input: toggle needs boolean state",
+      "valid": false,
+      "error": "must start as",
+      "spec": {
+        "specVersion": 1,
+        "id": "w",
+        "title": "T",
+        "slot": "home.top",
+        "state": {
+          "t": "yes"
+        },
+        "root": {
+          "type": "input",
+          "kind": "toggle",
+          "bind": "t"
+        }
+      }
+    },
+    {
+      "name": "input: date state format",
+      "valid": false,
+      "error": "must start as",
+      "spec": {
+        "specVersion": 1,
+        "id": "w",
+        "title": "T",
+        "slot": "home.top",
+        "state": {
+          "d": "04/10/2026"
+        },
+        "root": {
+          "type": "input",
+          "kind": "date",
+          "bind": "d"
+        }
+      }
+    },
+    {
+      "name": "input: prop for wrong kind",
+      "valid": false,
+      "error": "only applies",
+      "spec": {
+        "specVersion": 1,
+        "id": "w",
+        "title": "T",
+        "slot": "home.top",
+        "state": {
+          "t": true
+        },
+        "root": {
+          "type": "input",
+          "kind": "toggle",
+          "bind": "t",
+          "min": 0
+        }
+      }
+    },
+    {
+      "name": "input: inside list template",
+      "valid": false,
+      "error": "list templates",
+      "spec": {
+        "specVersion": 1,
+        "id": "w",
+        "title": "T",
+        "slot": "home.top",
+        "state": {
+          "a": null
+        },
+        "root": {
+          "type": "list",
+          "items": {
+            "var": "tx"
+          },
+          "template": {
+            "type": "input",
+            "kind": "number",
+            "bind": "a"
+          }
+        }
+      }
+    },
+    {
+      "name": "input: state initial value must be literal",
+      "valid": false,
+      "error": "literal",
+      "spec": {
+        "specVersion": 1,
+        "id": "w",
+        "title": "T",
+        "slot": "home.top",
+        "state": {
+          "a": {
+            "var": "user.budget"
+          }
+        },
+        "root": {
+          "type": "input",
+          "kind": "number",
+          "bind": "a"
+        }
+      }
+    },
+    {
+      "name": "input: binding named state",
+      "valid": false,
+      "error": "invalid binding name",
+      "spec": {
+        "specVersion": 1,
+        "id": "w",
+        "title": "T",
+        "slot": "home.top",
+        "root": {
+          "type": "text",
+          "value": "x"
+        },
+        "bindings": {
+          "state": 1
+        }
+      }
     }
   ]
 }

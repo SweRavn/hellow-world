@@ -93,8 +93,13 @@ class HttpGenerator(
     }
 }
 
-/** A spec bound to a data snapshot, ready to render. */
-class BoundWidget(val spec: WidgetSpec, private val vars: Map<String, JsonElement>, private val formatter: Formatter) {
+/** A spec bound to a data snapshot and the widget's current input [state], ready to render. */
+class BoundWidget(
+    val spec: WidgetSpec,
+    val state: Map<String, JsonElement>,
+    private val vars: Map<String, JsonElement>,
+    private val formatter: Formatter,
+) {
     fun eval(expr: JsonElement?, scope: ItemScope? = null): JsonElement =
         if (expr == null) JsonNull else Evaluator(vars, formatter).evaluate(expr, scope)
 }
@@ -128,7 +133,7 @@ class Graft(
     val dataVersion: StateFlow<Long> = _dataVersion.asStateFlow()
 
     fun addDataSource(name: String, source: DataSource) = apply {
-        require(Regex("^[A-Za-z_][A-Za-z0-9_]*$").matches(name)) { "invalid data source name \"$name\"" }
+        require(Regex("^[A-Za-z_][A-Za-z0-9_]*$").matches(name) && name != "state") { "invalid data source name \"$name\"" }
         sources[name] = source
     }
 
@@ -181,9 +186,18 @@ class Graft(
         return slots[slot]?.maxWidgets?.let { list.takeLast(it) } ?: list
     }
 
+    /** Headless controller for one widget: view tree + input getters/setters for any UI toolkit. */
+    fun controller(spec: WidgetSpec, data: Map<String, JsonElement>, state: Map<String, JsonElement> = Inputs.initialState(spec)) =
+        WidgetController(this, spec, data, state)
+
     suspend fun snapshot(): Map<String, JsonElement> = sources.mapValues { (_, s) -> s.get() }
 
-    /** Resolves bindings against a data snapshot. Throws [EvalException] if the budget is exceeded. */
-    fun bind(spec: WidgetSpec, data: Map<String, JsonElement>) =
-        BoundWidget(spec, resolveBindings(spec.bindings, data, formatter), formatter)
+    /**
+     * Resolves bindings against a data snapshot and the widget's input [state] (defaults to its
+     * initial values). Throws [EvalException] if the budget is exceeded.
+     */
+    fun bind(spec: WidgetSpec, data: Map<String, JsonElement>, state: Map<String, JsonElement> = Inputs.initialState(spec)): BoundWidget {
+        val scope = if (spec.state != null) data + ("state" to JsonObject(state)) else data
+        return BoundWidget(spec, state, resolveBindings(spec.bindings, scope, formatter), formatter)
+    }
 }

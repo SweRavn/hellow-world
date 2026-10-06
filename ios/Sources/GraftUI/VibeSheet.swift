@@ -11,7 +11,8 @@ public struct VibeSheet: View {
     @State private var prompt = ""
     @State private var selectedSlot: String?
     @State private var current: WidgetSpec?
-    @State private var preview: BoundWidget?
+    @State private var preview: WidgetSpec?
+    @State private var previewData: [String: JSON] = [:]
     @State private var busy = false
     @State private var error: String?
 
@@ -43,7 +44,8 @@ public struct VibeSheet: View {
                     if busy { ProgressView("Building your widget…") }
                     if let error { Text(error).font(.footnote).foregroundStyle(.red) }
                     if let preview {
-                        WidgetView(preview)
+                        // Live preview: the user can try the widget's inputs before adding it.
+                        LiveWidgetView(graft: graft, spec: preview, data: previewData).id(preview)
                             .padding(8)
                             .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.accentColor, style: StrokeStyle(lineWidth: 1, dash: [4])))
                     }
@@ -53,7 +55,7 @@ public struct VibeSheet: View {
                             .buttonStyle(.bordered)
                             .disabled(busy || prompt.trimmingCharacters(in: .whitespaces).isEmpty)
                         if let preview {
-                            Button(edit == nil ? "Add" : "Save") { Task { await accept(preview.spec) } }
+                            Button(edit == nil ? "Add" : "Save") { Task { await accept(preview) } }
                                 .buttonStyle(.borderedProminent)
                                 .disabled(busy)
                         }
@@ -73,7 +75,8 @@ public struct VibeSheet: View {
         defer { busy = false }
         do {
             let spec = try await graft.propose(prompt.trimmingCharacters(in: .whitespacesAndNewlines), slot: selectedSlot, edit: current)
-            preview = try graft.bind(spec, data: try await graft.snapshot())
+            previewData = try await graft.snapshot()
+            preview = spec
             current = spec
             prompt = ""
         } catch let e as GraftError {

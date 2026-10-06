@@ -1,0 +1,938 @@
+{
+  "data": {
+    "tx": [
+      {
+        "amount": 12.5,
+        "category": "Food",
+        "merchant": "Cafe"
+      },
+      {
+        "amount": 40,
+        "category": "Transport",
+        "merchant": "SJ"
+      },
+      {
+        "amount": 7.5,
+        "category": "Food",
+        "merchant": "ICA"
+      }
+    ],
+    "user": {
+      "budget": 100
+    }
+  },
+  "cases": [
+    {
+      "name": "display components",
+      "spec": {
+        "specVersion": 1,
+        "id": "w",
+        "title": "T",
+        "slot": "home.top",
+        "root": {
+          "type": "card",
+          "title": "Spend",
+          "children": [
+            {
+              "type": "text",
+              "value": {
+                "sum": [
+                  {
+                    "var": "tx"
+                  },
+                  "amount"
+                ]
+              },
+              "style": "title",
+              "color": "accent"
+            },
+            {
+              "type": "text",
+              "value": null,
+              "color": {
+                "if": [
+                  true,
+                  "nonsense",
+                  "x"
+                ]
+              }
+            },
+            {
+              "type": "metric",
+              "label": "Count",
+              "value": {
+                "count": [
+                  {
+                    "var": "tx"
+                  }
+                ]
+              },
+              "caption": ""
+            },
+            {
+              "type": "metric",
+              "label": "Avg",
+              "value": {
+                "avg": [
+                  {
+                    "var": "tx"
+                  },
+                  "amount"
+                ]
+              },
+              "caption": "per purchase",
+              "color": "positive"
+            },
+            {
+              "type": "progress",
+              "value": {
+                "sum": [
+                  {
+                    "var": "tx"
+                  },
+                  "amount"
+                ]
+              },
+              "max": {
+                "var": "user.budget"
+              },
+              "label": "Budget"
+            },
+            {
+              "type": "progress",
+              "value": 150,
+              "max": 100
+            },
+            {
+              "type": "badge",
+              "value": true
+            },
+            {
+              "type": "divider"
+            }
+          ]
+        }
+      },
+      "expect": {
+        "type": "card",
+        "key": "root",
+        "title": "Spend",
+        "children": [
+          {
+            "type": "text",
+            "key": "root.0",
+            "text": "60",
+            "style": "title",
+            "color": "accent"
+          },
+          {
+            "type": "text",
+            "key": "root.1",
+            "text": "",
+            "style": "body",
+            "color": "default"
+          },
+          {
+            "type": "metric",
+            "key": "root.2",
+            "label": "Count",
+            "value": "3",
+            "caption": null,
+            "color": "default"
+          },
+          {
+            "type": "metric",
+            "key": "root.3",
+            "label": "Avg",
+            "value": "20",
+            "caption": "per purchase",
+            "color": "positive"
+          },
+          {
+            "type": "progress",
+            "key": "root.4",
+            "label": "Budget",
+            "value": 60,
+            "max": 100,
+            "fraction": 0.6
+          },
+          {
+            "type": "progress",
+            "key": "root.5",
+            "label": null,
+            "value": 150,
+            "max": 100,
+            "fraction": 1
+          },
+          {
+            "type": "badge",
+            "key": "root.6",
+            "text": "true",
+            "color": "default"
+          },
+          {
+            "type": "divider",
+            "key": "root.7"
+          }
+        ]
+      }
+    },
+    {
+      "name": "layout",
+      "spec": {
+        "specVersion": 1,
+        "id": "w",
+        "title": "T",
+        "slot": "home.top",
+        "root": {
+          "type": "column",
+          "gap": 4,
+          "children": [
+            {
+              "type": "row",
+              "align": "spaceBetween",
+              "children": [
+                {
+                  "type": "text",
+                  "value": "a"
+                },
+                {
+                  "type": "text",
+                  "value": 2.5
+                }
+              ]
+            },
+            {
+              "type": "row",
+              "gap": 0,
+              "children": []
+            }
+          ]
+        }
+      },
+      "expect": {
+        "type": "column",
+        "key": "root",
+        "gap": 4,
+        "children": [
+          {
+            "type": "row",
+            "key": "root.0",
+            "gap": null,
+            "align": "spaceBetween",
+            "children": [
+              {
+                "type": "text",
+                "key": "root.0.0",
+                "text": "a",
+                "style": "body",
+                "color": "default"
+              },
+              {
+                "type": "text",
+                "key": "root.0.1",
+                "text": "2.5",
+                "style": "body",
+                "color": "default"
+              }
+            ]
+          },
+          {
+            "type": "row",
+            "key": "root.1",
+            "gap": 0,
+            "align": "start",
+            "children": []
+          }
+        ]
+      }
+    },
+    {
+      "name": "list with template and empty",
+      "spec": {
+        "specVersion": 1,
+        "id": "w",
+        "title": "T",
+        "slot": "home.top",
+        "root": {
+          "type": "column",
+          "children": [
+            {
+              "type": "list",
+              "items": {
+                "sort": [
+                  {
+                    "var": "tx"
+                  },
+                  "amount",
+                  "desc"
+                ]
+              },
+              "limit": 2,
+              "template": {
+                "type": "row",
+                "children": [
+                  {
+                    "type": "text",
+                    "value": {
+                      "var": "item.merchant"
+                    }
+                  },
+                  {
+                    "type": "badge",
+                    "value": {
+                      "var": "index"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "type": "list",
+              "items": {
+                "filter": [
+                  {
+                    "var": "tx"
+                  },
+                  {
+                    ">": [
+                      {
+                        "var": "item.amount"
+                      },
+                      1000
+                    ]
+                  }
+                ]
+              },
+              "empty": "Nothing big",
+              "template": {
+                "type": "text",
+                "value": "x"
+              }
+            }
+          ]
+        }
+      },
+      "expect": {
+        "type": "column",
+        "key": "root",
+        "gap": null,
+        "children": [
+          {
+            "type": "list",
+            "key": "root.0",
+            "items": [
+              {
+                "type": "row",
+                "key": "root.0.0",
+                "gap": null,
+                "align": "start",
+                "children": [
+                  {
+                    "type": "text",
+                    "key": "root.0.0.0",
+                    "text": "SJ",
+                    "style": "body",
+                    "color": "default"
+                  },
+                  {
+                    "type": "badge",
+                    "key": "root.0.0.1",
+                    "text": "0",
+                    "color": "default"
+                  }
+                ]
+              },
+              {
+                "type": "row",
+                "key": "root.0.1",
+                "gap": null,
+                "align": "start",
+                "children": [
+                  {
+                    "type": "text",
+                    "key": "root.0.1.0",
+                    "text": "Cafe",
+                    "style": "body",
+                    "color": "default"
+                  },
+                  {
+                    "type": "badge",
+                    "key": "root.0.1.1",
+                    "text": "1",
+                    "color": "default"
+                  }
+                ]
+              }
+            ],
+            "empty": null
+          },
+          {
+            "type": "list",
+            "key": "root.1",
+            "items": [],
+            "empty": "Nothing big"
+          }
+        ]
+      }
+    },
+    {
+      "name": "bar chart",
+      "spec": {
+        "specVersion": 1,
+        "id": "w",
+        "title": "T",
+        "slot": "home.top",
+        "bindings": {
+          "g": {
+            "group": [
+              {
+                "var": "tx"
+              },
+              {
+                "var": "item.category"
+              },
+              {
+                "var": "item.amount"
+              }
+            ]
+          }
+        },
+        "root": {
+          "type": "barChart",
+          "items": {
+            "map": [
+              {
+                "var": "g"
+              },
+              {
+                "object": [
+                  "label",
+                  {
+                    "var": "item.key"
+                  },
+                  "value",
+                  {
+                    "var": "item.sum"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "type": "barChart",
+        "key": "root",
+        "bars": [
+          {
+            "label": "Food",
+            "value": 20,
+            "fraction": 0.5
+          },
+          {
+            "label": "Transport",
+            "value": 40,
+            "fraction": 1
+          }
+        ]
+      }
+    },
+    {
+      "name": "visible splices children",
+      "spec": {
+        "specVersion": 1,
+        "id": "w",
+        "title": "T",
+        "slot": "home.top",
+        "root": {
+          "type": "column",
+          "children": [
+            {
+              "type": "visible",
+              "when": {
+                ">": [
+                  {
+                    "count": [
+                      {
+                        "var": "tx"
+                      }
+                    ]
+                  },
+                  1
+                ]
+              },
+              "children": [
+                {
+                  "type": "text",
+                  "value": "shown"
+                },
+                {
+                  "type": "divider"
+                }
+              ]
+            },
+            {
+              "type": "visible",
+              "when": false,
+              "children": [
+                {
+                  "type": "text",
+                  "value": "hidden"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "value": "end"
+            }
+          ]
+        }
+      },
+      "expect": {
+        "type": "column",
+        "key": "root",
+        "gap": null,
+        "children": [
+          {
+            "type": "text",
+            "key": "root.0.0",
+            "text": "shown",
+            "style": "body",
+            "color": "default"
+          },
+          {
+            "type": "divider",
+            "key": "root.0.1"
+          },
+          {
+            "type": "text",
+            "key": "root.2",
+            "text": "end",
+            "style": "body",
+            "color": "default"
+          }
+        ]
+      }
+    },
+    {
+      "name": "inputs with initial state",
+      "spec": {
+        "specVersion": 1,
+        "id": "w",
+        "title": "T",
+        "slot": "home.top",
+        "state": {
+          "a": null,
+          "b": 2,
+          "people": 3,
+          "tip": true,
+          "cat": "Food",
+          "day": null,
+          "note": "hi"
+        },
+        "root": {
+          "type": "column",
+          "children": [
+            {
+              "type": "input",
+              "kind": "number",
+              "bind": "a",
+              "label": "First",
+              "placeholder": "0",
+              "min": -5,
+              "step": 0.5
+            },
+            {
+              "type": "input",
+              "kind": "slider",
+              "bind": "people",
+              "min": 1,
+              "max": 10,
+              "step": 1
+            },
+            {
+              "type": "input",
+              "kind": "toggle",
+              "bind": "tip",
+              "label": {
+                "concat": [
+                  "Tip ",
+                  10,
+                  "%"
+                ]
+              }
+            },
+            {
+              "type": "input",
+              "kind": "select",
+              "bind": "cat",
+              "options": {
+                "pluck": [
+                  {
+                    "group": [
+                      {
+                        "var": "tx"
+                      },
+                      {
+                        "var": "item.category"
+                      }
+                    ]
+                  },
+                  "key"
+                ]
+              }
+            },
+            {
+              "type": "input",
+              "kind": "date",
+              "bind": "day"
+            },
+            {
+              "type": "input",
+              "kind": "text",
+              "bind": "note",
+              "multiline": true
+            },
+            {
+              "type": "metric",
+              "label": "Sum",
+              "value": {
+                "+": [
+                  {
+                    "var": "state.a"
+                  },
+                  {
+                    "var": "state.b"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "expect": {
+        "type": "column",
+        "key": "root",
+        "gap": null,
+        "children": [
+          {
+            "type": "input",
+            "key": "root.0",
+            "kind": "number",
+            "name": "a",
+            "label": "First",
+            "placeholder": "0",
+            "min": -5,
+            "max": null,
+            "step": 0.5,
+            "multiline": false,
+            "options": [],
+            "value": null
+          },
+          {
+            "type": "input",
+            "key": "root.1",
+            "kind": "slider",
+            "name": "people",
+            "label": null,
+            "placeholder": null,
+            "min": 1,
+            "max": 10,
+            "step": 1,
+            "multiline": false,
+            "options": [],
+            "value": 3
+          },
+          {
+            "type": "input",
+            "key": "root.2",
+            "kind": "toggle",
+            "name": "tip",
+            "label": "Tip 10%",
+            "placeholder": null,
+            "min": null,
+            "max": null,
+            "step": null,
+            "multiline": false,
+            "options": [],
+            "value": true
+          },
+          {
+            "type": "input",
+            "key": "root.3",
+            "kind": "select",
+            "name": "cat",
+            "label": null,
+            "placeholder": null,
+            "min": null,
+            "max": null,
+            "step": null,
+            "multiline": false,
+            "options": [
+              {
+                "label": "Food",
+                "value": "Food"
+              },
+              {
+                "label": "Transport",
+                "value": "Transport"
+              }
+            ],
+            "value": "Food"
+          },
+          {
+            "type": "input",
+            "key": "root.4",
+            "kind": "date",
+            "name": "day",
+            "label": null,
+            "placeholder": null,
+            "min": null,
+            "max": null,
+            "step": null,
+            "multiline": false,
+            "options": [],
+            "value": null
+          },
+          {
+            "type": "input",
+            "key": "root.5",
+            "kind": "text",
+            "name": "note",
+            "label": null,
+            "placeholder": null,
+            "min": null,
+            "max": null,
+            "step": null,
+            "multiline": true,
+            "options": [],
+            "value": "hi"
+          },
+          {
+            "type": "metric",
+            "key": "root.6",
+            "label": "Sum",
+            "value": "2",
+            "caption": null,
+            "color": "default"
+          }
+        ]
+      }
+    },
+    {
+      "name": "inputs with given state",
+      "spec": {
+        "specVersion": 1,
+        "id": "w",
+        "title": "T",
+        "slot": "home.top",
+        "state": {
+          "a": null,
+          "b": 2,
+          "people": 3,
+          "tip": true,
+          "cat": "Food",
+          "day": null,
+          "note": "hi"
+        },
+        "root": {
+          "type": "column",
+          "children": [
+            {
+              "type": "input",
+              "kind": "number",
+              "bind": "a",
+              "label": "First",
+              "placeholder": "0",
+              "min": -5,
+              "step": 0.5
+            },
+            {
+              "type": "input",
+              "kind": "slider",
+              "bind": "people",
+              "min": 1,
+              "max": 10,
+              "step": 1
+            },
+            {
+              "type": "input",
+              "kind": "toggle",
+              "bind": "tip",
+              "label": {
+                "concat": [
+                  "Tip ",
+                  10,
+                  "%"
+                ]
+              }
+            },
+            {
+              "type": "input",
+              "kind": "select",
+              "bind": "cat",
+              "options": {
+                "pluck": [
+                  {
+                    "group": [
+                      {
+                        "var": "tx"
+                      },
+                      {
+                        "var": "item.category"
+                      }
+                    ]
+                  },
+                  "key"
+                ]
+              }
+            },
+            {
+              "type": "input",
+              "kind": "date",
+              "bind": "day"
+            },
+            {
+              "type": "input",
+              "kind": "text",
+              "bind": "note",
+              "multiline": true
+            },
+            {
+              "type": "metric",
+              "label": "Sum",
+              "value": {
+                "+": [
+                  {
+                    "var": "state.a"
+                  },
+                  {
+                    "var": "state.b"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "state": {
+        "a": 1.5,
+        "b": 2,
+        "people": 3,
+        "tip": false,
+        "cat": "Transport",
+        "day": "2026-10-04",
+        "note": ""
+      },
+      "expect": {
+        "type": "column",
+        "key": "root",
+        "gap": null,
+        "children": [
+          {
+            "type": "input",
+            "key": "root.0",
+            "kind": "number",
+            "name": "a",
+            "label": "First",
+            "placeholder": "0",
+            "min": -5,
+            "max": null,
+            "step": 0.5,
+            "multiline": false,
+            "options": [],
+            "value": 1.5
+          },
+          {
+            "type": "input",
+            "key": "root.1",
+            "kind": "slider",
+            "name": "people",
+            "label": null,
+            "placeholder": null,
+            "min": 1,
+            "max": 10,
+            "step": 1,
+            "multiline": false,
+            "options": [],
+            "value": 3
+          },
+          {
+            "type": "input",
+            "key": "root.2",
+            "kind": "toggle",
+            "name": "tip",
+            "label": "Tip 10%",
+            "placeholder": null,
+            "min": null,
+            "max": null,
+            "step": null,
+            "multiline": false,
+            "options": [],
+            "value": false
+          },
+          {
+            "type": "input",
+            "key": "root.3",
+            "kind": "select",
+            "name": "cat",
+            "label": null,
+            "placeholder": null,
+            "min": null,
+            "max": null,
+            "step": null,
+            "multiline": false,
+            "options": [
+              {
+                "label": "Food",
+                "value": "Food"
+              },
+              {
+                "label": "Transport",
+                "value": "Transport"
+              }
+            ],
+            "value": "Transport"
+          },
+          {
+            "type": "input",
+            "key": "root.4",
+            "kind": "date",
+            "name": "day",
+            "label": null,
+            "placeholder": null,
+            "min": null,
+            "max": null,
+            "step": null,
+            "multiline": false,
+            "options": [],
+            "value": "2026-10-04"
+          },
+          {
+            "type": "input",
+            "key": "root.5",
+            "kind": "text",
+            "name": "note",
+            "label": null,
+            "placeholder": null,
+            "min": null,
+            "max": null,
+            "step": null,
+            "multiline": true,
+            "options": [],
+            "value": ""
+          },
+          {
+            "type": "metric",
+            "key": "root.6",
+            "label": "Sum",
+            "value": "3.5",
+            "caption": null,
+            "color": "default"
+          }
+        ]
+      }
+    }
+  ]
+}

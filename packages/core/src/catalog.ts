@@ -5,7 +5,10 @@
 export type PropKind =
   | "expr" // literal or expression
   | "color" // color token literal or expression yielding one
-  | "number" // literal number
+  | "number" // non-negative literal number (sizes, limits)
+  | "signed" // any finite literal number (input min/max/step)
+  | "bool" // boolean literal
+  | "stateRef" // string literal naming a declared `state` entry
   | "node" // a single child node
   | "children" // array of nodes
   | { enum: readonly string[] };
@@ -25,6 +28,8 @@ export interface ComponentDef {
 
 const children: PropDef = { kind: "children", description: "Child nodes" };
 const color: PropDef = { kind: "color", description: "Semantic color token" };
+
+export type InputKind = "text" | "number" | "slider" | "toggle" | "select" | "date";
 
 export const COMPONENTS: Record<string, ComponentDef> = {
   card: {
@@ -89,6 +94,22 @@ export const COMPONENTS: Record<string, ComponentDef> = {
     props: { value: { kind: "expr", required: true, description: "Label" }, color },
   },
   divider: { description: "Thin separator line.", props: {} },
+  input: {
+    description:
+      "A user input bound to a widget `state` entry; read its value anywhere with {\"var\": \"state.<name>\"}. " +
+      "kinds: text, number, slider (needs min & max), toggle, select (needs options), date (value \"YYYY-MM-DD\").",
+    props: {
+      kind: { kind: { enum: ["text", "number", "slider", "toggle", "select", "date"] }, required: true, description: "Which input" },
+      bind: { kind: "stateRef", required: true, description: "Name of the state entry this input reads and writes" },
+      label: { kind: "expr", description: "Label shown with the input" },
+      placeholder: { kind: "expr", description: "Hint text (text, number)" },
+      min: { kind: "signed", description: "Minimum (number, slider)" },
+      max: { kind: "signed", description: "Maximum (number, slider)" },
+      step: { kind: "signed", description: "Step size (number, slider)" },
+      options: { kind: "expr", description: "select: array of strings/numbers or {label, value} objects" },
+      multiline: { kind: "bool", description: "text: allow several lines" },
+    },
+  },
   visible: {
     description: "Renders children only when `when` is truthy.",
     props: { when: { kind: "expr", required: true, description: "Condition" }, children },

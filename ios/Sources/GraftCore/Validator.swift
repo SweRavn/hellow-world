@@ -72,6 +72,8 @@ public struct WidgetSpec: Hashable, Identifiable, Sendable {
     public var title: String { json["title"]?.string ?? "" }
     public var slot: String { json["slot"]?.string ?? "" }
     public var prompt: String? { json["prompt"]?.string }
+    /// Declared input state with initial values; nil when the widget has no inputs.
+    public var state: JSONObject? { json["state"]?.object }
     public var bindings: JSONObject? { json["bindings"]?.object }
     public var root: JSONObject { json["root"]?.object ?? JSONObject() }
 
@@ -85,7 +87,7 @@ public struct WidgetSpec: Hashable, Identifiable, Sendable {
 // MARK: - Component catalog. Keep in sync with spec/README.md §2.1.
 
 enum PropKind: Equatable {
-    case expr, color, number, node, children
+    case expr, color, number, signed, bool, stateRef, node, children
     case oneOf([String])
 }
 
@@ -106,6 +108,13 @@ let components: [String: [String: PropDef]] = [
     "barChart": ["items": PropDef(kind: .expr, required: true), "max": PropDef(kind: .expr)],
     "badge": ["value": PropDef(kind: .expr, required: true), "color": PropDef(kind: .color)],
     "divider": [:],
+    "input": [
+        "kind": PropDef(kind: .oneOf(["text", "number", "slider", "toggle", "select", "date"]), required: true),
+        "bind": PropDef(kind: .stateRef, required: true),
+        "label": PropDef(kind: .expr), "placeholder": PropDef(kind: .expr),
+        "min": PropDef(kind: .signed), "max": PropDef(kind: .signed), "step": PropDef(kind: .signed),
+        "options": PropDef(kind: .expr), "multiline": PropDef(kind: .bool),
+    ],
     "visible": ["when": PropDef(kind: .expr, required: true), "children": PropDef(kind: .children)],
 ]
 
@@ -139,6 +148,29 @@ public func validateSpec(_ input: JSON, manifest: Manifest) -> ValidationResult 
     }
 
     var known = Set(manifest.dataSources.keys)
+
+    // Widget-local state: named, literal initial values that inputs read and write.
+    let state = spec["state"]?.object
+    if spec["state"] != nil {
+        if let state {
+            if state.count > Limits.maxStateEntries { err("state", "at most \(Limits.maxStateEntries) state entries") }
+            for (name, v) in state.entries {
+                if !isIdentifier(name) { err("state.\(name)", "state names must be identifiers") }
+                let literal: Bool
+                switch v {
+                case .null, .bool: literal = true
+                case .number(let n): literal = n.isFinite
+                case .string(let s): literal = s.count <= Limits.maxTextLength
+                default: literal = false
+                }
+                if !literal { err("state.\(name)", "initial value must be a literal string, number, boolean or null") }
+            }
+            if manifest.dataSources["state"] != nil { err("state", "conflicts with a data source named \"state\"") }
+            known.insert("state")
+        } else {
+            err("state", "must be an object of name -> initial value")
+        }
+    }
 
     func checkExpr(_ e: JSON, _ path: String, _ inIter: Bool) {
         if case .array(let a) = e {
@@ -176,14 +208,47 @@ public func validateSpec(_ input: JSON, manifest: Manifest) -> ValidationResult 
         if case .object(let bindings) = b {
             if bindings.count > Limits.maxBindings { err("bindings", "at most \(Limits.maxBindings) bindings") }
             for (name, expr) in bindings.entries {
-                if reserved.contains(name) || manifest.dataSources[name] != nil || !isIdentifier(name) {
-                    err("bindings.\(name)", "invalid binding name (must be an identifier, not a data source name, item or index)")
+                if reserved.contains(name) || name == "state" || manifest.dataSources[name] != nil || !isIdentifier(name) {
+                    err("bindings.\(name)", "invalid binding name (must be an identifier, not a data source name, item, index or state)")
                 }
                 checkExpr(expr, "bindings.\(name)", false)
                 known.insert(name)
             }
         } else {
             err("bindings", "must be an object")
+        }
+    }
+
+    /// Cross-prop rules for inputs: per-kind required props and state value types.
+    func checkInput(_ n: JSONObject, _ path: String, _ inIter: Bool) {
+        if inIter { err(path, "inputs cannot be inside list templates") }
+        let kind = n["kind"]?.string ?? ""
+        let initial = n["bind"]?.string.flatMap { state?[$0] }
+        let numeric = kind == "number" || kind == "slider"
+        for p in ["min", "max", "step"] where n[p] != nil && !numeric { err("\(path).\(p)", "only applies to number and slider inputs") }
+        if n["placeholder"] != nil, kind != "text", kind != "number" { err("\(path).placeholder", "only applies to text and number inputs") }
+        if n["multiline"] != nil, kind != "text" { err("\(path).multiline", "only applies to text inputs") }
+        if (n["options"] != nil) != (kind == "select") {
+            err("\(path).options", kind == "select" ? "select inputs need options" : "only applies to select inputs")
+        }
+        let min = n["min"]?.number, max = n["max"]?.number
+        if kind == "slider", min == nil || max == nil { err(path, "slider inputs need min and max") }
+        if let min, let max, min > max { err("\(path).min", "min must be <= max") }
+        if let step = n["step"]?.number, step <= 0 { err("\(path).step", "step must be > 0") }
+        guard let initial else { return }
+        let ok: Bool
+        switch kind {
+        case "toggle": ok = initial.bool != nil
+        case "slider": ok = initial.number != nil
+        case "number": ok = initial.isNull || initial.number != nil
+        case "date": ok = initial.isNull || (initial.string.map { $0.range(of: #"^\d{4}-\d{2}-\d{2}$"#, options: .regularExpression) != nil } ?? false)
+        case "select": ok = initial.isNull || initial.string != nil || initial.number != nil
+        default: ok = initial.isNull || initial.string != nil
+        }
+        if !ok {
+            let want = ["toggle": "a boolean", "slider": "a number", "number": "a number or null", "date": "\"YYYY-MM-DD\" or null",
+                        "select": "a string, number or null", "text": "a string or null"][kind] ?? "a compatible value"
+            err("\(path).bind", "state \"\(n["bind"]?.string ?? "")\" must start as \(want) for a \(kind) input")
         }
     }
 
@@ -217,6 +282,15 @@ public func validateSpec(_ input: JSON, manifest: Manifest) -> ValidationResult 
                 checkNode(value, p, inIter || pd.iterates, depth + 1)
             case .number:
                 if (value.number ?? -1) < 0 { err(p, "must be a non-negative number literal") }
+            case .signed:
+                if value.number == nil { err(p, "must be a number literal") }
+            case .bool:
+                if value.bool == nil { err(p, "must be true or false") }
+            case .stateRef:
+                if !(value.string.map { state?[$0] != nil } ?? false) {
+                    let declared = state.map { $0.keys.isEmpty ? "none" : $0.keys.joined(separator: ", ") } ?? "none (add a top-level \"state\" object)"
+                    err(p, "must name a declared state entry; declared: \(declared)")
+                }
             case .color:
                 if let s = value.string {
                     if !colorTokens.contains(s) { err(p, "color must be one of \(colorTokens.joined(separator: ", "))") }
@@ -235,6 +309,7 @@ public func validateSpec(_ input: JSON, manifest: Manifest) -> ValidationResult 
         if type == "list", (obj["limit"]?.number ?? 0) > Double(Limits.maxListLimit) {
             err("\(path).limit", "limit must be <= \(Limits.maxListLimit)")
         }
+        if type == "input" { checkInput(obj, path, inIter) }
     }
 
     if spec["root"] == nil { err("root", "missing") } else { checkNode(spec["root"], "root", false, 1) }

@@ -3,6 +3,8 @@ import { evaluate, resolveBindings, type EvalContext, type Formatter } from "./e
 import type { GenerateRequest } from "./prompt.js";
 import { SPEC_VERSION, type DataSourceInfo, type Expr, type Json, type Manifest, type SlotInfo, type WidgetSpec } from "./types.js";
 import { validateSpec } from "./validate.js";
+import { initialState } from "./input.js";
+import { WidgetController, watchSlot, type SlotItem } from "./view.js";
 
 /** A piece of app data the host exposes to generated widgets. */
 export interface DataSource extends DataSourceInfo {
@@ -101,7 +103,7 @@ export class Graft {
   }
 
   addDataSource(name: string, source: DataSource): this {
-    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) throw new GraftError(`invalid data source name "${name}"`);
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name) || name === "state") throw new GraftError(`invalid data source name "${name}"`);
     this.sources.set(name, source);
     if (source.subscribe) this.unsubs.push(source.subscribe(() => this.emit()));
     return this;
@@ -199,14 +201,28 @@ export class Graft {
     return Object.fromEntries(entries);
   }
 
-  /** Prepares a spec for rendering against a data snapshot: resolves bindings, returns an evaluator. */
-  bind(spec: WidgetSpec, data: Record<string, Json>): BoundWidget {
+  /**
+   * Prepares a spec for rendering against a data snapshot and the widget's current input state
+   * (defaults to its initial state): resolves bindings, returns an evaluator.
+   */
+  bind(spec: WidgetSpec, data: Record<string, Json>, state: Record<string, Json> = initialState(spec)): BoundWidget {
     const base: Omit<EvalContext, "vars"> = { formatter: this.formatter };
-    const vars = resolveBindings(spec.bindings, data, base);
+    const vars = resolveBindings(spec.bindings, spec.state ? { ...data, state } : data, base);
     return {
       spec,
+      state,
       eval: (expr, scope) => evaluate(expr, { ...base, vars, ...(scope && { scope }) }),
     };
+  }
+
+  /** Headless controller for one widget: view tree + input getters/setters for any UI framework. */
+  controller(spec: WidgetSpec, data: Record<string, Json>, state?: Record<string, Json>): WidgetController {
+    return new WidgetController(this, spec, data, state);
+  }
+
+  /** Headless slot: reports the slot's widgets (each with a live controller) whenever they change. */
+  watchSlot(slotId: string, onItems: (items: SlotItem[]) => void): () => void {
+    return watchSlot(this, slotId, onItems);
   }
 
   dispose(): void {
@@ -221,5 +237,7 @@ export class Graft {
 
 export interface BoundWidget {
   spec: WidgetSpec;
+  /** Current input values, by state name. */
+  state: Record<string, Json>;
   eval(expr: Expr, scope?: { item: Json; index: number }): Json;
 }

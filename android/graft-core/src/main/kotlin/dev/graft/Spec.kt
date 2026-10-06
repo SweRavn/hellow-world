@@ -14,6 +14,8 @@ object Limits {
     const val MAX_BINDINGS = 50
     const val MAX_LIST_LIMIT = 100
     const val MAX_STEPS = 100_000
+    const val MAX_STATE_ENTRIES = 20
+    const val MAX_TEXT_LENGTH = 1000
 }
 
 val COLOR_TOKENS = listOf("default", "muted", "accent", "positive", "negative", "warning")
@@ -58,6 +60,8 @@ class WidgetSpec internal constructor(val json: JsonObject) {
     val title: String get() = json.getValue("title").jsonPrimitive.content
     val slot: String get() = json.getValue("slot").jsonPrimitive.content
     val prompt: String? get() = J.str(json["prompt"])
+    /** Declared input state with initial values, or null when the widget has no inputs. */
+    val state: JsonObject? get() = json["state"] as? JsonObject
     val bindings: JsonObject? get() = json["bindings"] as? JsonObject
     val root: JsonObject get() = json.getValue("root") as JsonObject
 

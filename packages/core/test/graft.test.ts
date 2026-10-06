@@ -94,4 +94,28 @@ describe("Graft", () => {
     const p = buildSystemPrompt();
     for (const c of ["card", "metric", "barChart", "list", "visible"]) expect(p).toContain(`- ${c}:`);
   });
+
+  it("binds widget state and recomputes bindings from it", async () => {
+    const calc = spec({
+      id: "calc",
+      state: { a: null, b: 4 },
+      bindings: { sum: { "+": [{ var: "state.a" }, { var: "state.b" }] } },
+      root: { type: "column", children: [
+        { type: "input", kind: "number", bind: "a" },
+        { type: "input", kind: "number", bind: "b" },
+        { type: "metric", label: "Sum", value: { var: "sum" } },
+      ] },
+    });
+    const { graft } = setup(calc);
+    const s = await graft.propose("add two numbers");
+    const data = await graft.snapshot();
+    expect(graft.bind(s, data).eval({ var: "sum" })).toBe(4);
+    expect(graft.bind(s, data, { a: 1.5, b: 4 }).eval({ var: "sum" })).toBe(5.5);
+    expect(graft.bind(s, data).state).toEqual({ a: null, b: 4 });
+  });
+
+  it("rejects a data source named state", () => {
+    const { graft } = setup(spec());
+    expect(() => graft.addDataSource("state", { description: "", schema: { type: "object" }, get: () => null })).toThrow(GraftError);
+  });
 });

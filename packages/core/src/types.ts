@@ -51,6 +51,8 @@ export interface WidgetSpec {
   title: string;
   slot: string;
   prompt?: string;
+  /** Widget-local state written by `input` nodes; read with {"var": "state.<name>"}. Literal initial values. */
+  state?: Record<string, Json>;
   bindings?: Record<string, Expr>;
   root: WidgetNode;
 }
@@ -61,4 +63,6 @@ export const LIMITS = {
   maxBindings: 50,
   maxListLimit: 100,
   maxSteps: 100_000,
+  maxStateEntries: 20,
+  maxTextLength: 1000,
 } as const;

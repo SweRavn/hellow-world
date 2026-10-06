@@ -26,8 +26,9 @@ It works like Lovable, but it lives *inside* your product: you add it as a libra
    `orderDetail.sidebar`, …). Graft never modifies the rest of your UI. It renders only inside slots you placed.
 3. **The user asks for a feature.** The built-in "vibe" panel or sheet sends the prompt and the manifest to your generator
    backend. The backend asks Claude for a **Widget Spec**, which is a JSON document built from a small component catalog
-   (card, metric, list, barChart, progress, …) and a JSONLogic-style expression language (`filter`, `group`, `sum`,
-   `format`, `startOf`, …).
+   (card, metric, list, barChart, progress, input, …) and a JSONLogic-style expression language (`filter`, `group`, `sum`,
+   `format`, `startOf`, …). Widgets can also take user input (text, number, slider, toggle, select and date controls),
+   so users can build calculators, filters and what-if tools. The formulas recompute as they type.
 4. **Validate, preview, accept.** The spec is validated on the server, where errors go back to Claude for repair, and again
    on the device. The user sees a live preview, refines it ("make it weekly instead") and adds it. Accepted widgets are
    persisted, and they re-render whenever your data changes.
@@ -48,12 +49,12 @@ The full contract is in [`spec/README.md`](spec/README.md). Shared conformance v
 | Path | What | Status |
 |---|---|---|
 | [`spec/`](spec) | Normative widget spec, expression language, conformance vectors | v1 |
-| [`packages/core`](packages/core) | `@graft/core` (TypeScript): types, expression engine, validator, system prompt, `Graft` engine | tested |
-| [`packages/web`](packages/web) | `@graft/web`: DOM renderer, `mountSlot`, vibe panel, `LocalStorageStore` | tested (unit + browser e2e) |
+| [`packages/core`](packages/core) | `@graft/core` (TypeScript): types, expression engine, validator, system prompt, `Graft` engine, headless controllers and view trees | tested |
+| [`packages/web`](packages/web) | `@graft/web`: optional DOM adapter (`mountSlot`, vibe panel, `LocalStorageStore`) | tested (unit + browser e2e) |
 | [`server/`](server) | Reference generator backend (Node + Claude API) with validate → repair loop | tested with a mocked client |
 | [`examples/web-demo`](examples/web-demo) | "Budgetly" expense tracker showing an integration | runs with an offline mock or Claude |
-| [`android/`](android) | `graft-core` (pure Kotlin, tested on JVM) and `graft-compose` (Compose UI) | core tested; Compose built in CI |
-| [`ios/`](ios) | Swift package: `GraftCore` and `GraftUI` (SwiftUI) | built and tested in CI (macOS) |
+| [`android/`](android) | `graft-core` (pure Kotlin, headless; tested on JVM) and optional `graft-compose` (Compose adapter) | core tested; Compose built in CI |
+| [`ios/`](ios) | Swift package: `GraftCore` (headless) and optional `GraftUI` (SwiftUI adapter) | built and tested in CI (macOS) |
 
 ## Quick start (web)
 
@@ -87,6 +88,53 @@ Headless use works too: `await graft.propose(prompt)` returns a validated spec, 
 `renderWidget(graft.bind(spec, data))` returns a DOM element.
 
 Theme with CSS custom properties: `:root { --graft-accent: #0f766e; --graft-radius: 16px; }`.
+
+## Use any UI framework
+
+Graft's core doesn't depend on a UI toolkit. For each widget it gives you a **controller** with a
+**view tree** of plain, display-ready nodes (`card`, `metric`, `list`, `input`, …). Every input node has
+a getter (`value`) and a setter (`set(raw)`). You render the tree with your own components and connect
+your controls' change handlers to `set`. Graft converts the value, updates the widget's state and
+recomputes, and the controller notifies you with the new tree. The DOM, Compose and SwiftUI renderers
+in this repo are optional adapters built on exactly this API. The tree's shape is in
+[`spec/README.md` §6](spec/README.md).
+
+React, for example:
+
+```tsx
+function useGraftSlot(graft: Graft, slotId: string) {
+  const [items, setItems] = useState<SlotItem[]>([]);
+  useEffect(() => graft.watchSlot(slotId, setItems), [graft, slotId]);
+  return items;
+}
+
+function useView(c: WidgetController) {
+  return useSyncExternalStore((cb) => c.subscribe(cb), () => c.view);
+}
+
+function Widget({ controller }: { controller: WidgetController }) {
+  const view = useView(controller);
+  return view ? <Node node={view} /> : <ErrorNote text={controller.error} />;
+}
+
+function Node({ node }: { node: ViewNode }) {
+  switch (node.type) {
+    case "card":   return <MyCard title={node.title}>{node.children.map((c) => <Node key={c.key} node={c} />)}</MyCard>;
+    case "metric": return <MyStat label={node.label} value={node.value} caption={node.caption} />;
+    case "input":
+      if (node.kind === "number")
+        return <MyNumberField label={node.label} defaultValue={node.value ?? ""} onChange={(e) => node.set(e.target.value)} />;
+      if (node.kind === "toggle")
+        return <MySwitch checked={node.value === true} onChange={(on) => node.set(on)} />;
+      // ...text, slider, select, date
+    // ...card, row, list, barChart, badge, divider
+  }
+}
+```
+
+On Android, `graft.controller(spec, data).view` is a `StateFlow<ViewNode?>` (a sealed class). On iOS,
+`graft.controller(spec, data:)` is an `ObservableObject` whose `view` is a `ViewNode` enum, with
+`subscribe` for UIKit. If a component's API doesn't take a plain change callback, wrap `set` in a lambda.
 
 ## Run the demo
 
@@ -129,7 +177,9 @@ the SDKs small and dependency-free. The shared conformance vectors keep the thre
 ## Roadmap ideas
 
 - **Actions**: host-registered actions (navigate, open a record, call an API with confirmation) that buttons in specs can trigger
-- **Parameters**: widgets with user inputs (date range picker, category filter)
+- **Opt-in general code**: a sandboxed, capability-limited `code` construct that developers can enable for web or
+  internal apps where store rules don't apply (design constraints in [`spec/README.md` §7](spec/README.md))
+- **Persisted input state**: remember what a user typed into a widget across sessions
 - More components (line chart, table, image from allow-listed URLs), and host-provided custom components
 - Sharing and moderation: let admins publish a user's widget to everyone, with a review queue
 - React, Vue and Flutter wrappers

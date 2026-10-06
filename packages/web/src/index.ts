@@ -1,8 +1,8 @@
 import type { WidgetSpec, WidgetStore } from "@graft/core";
 
 export * from "@graft/core";
-export { renderWidget } from "./render.js";
-export { mountSlot, renderSpec, type SlotOptions } from "./slot.js";
+export { renderView, type RenderOptions } from "./render.js";
+export { mountController, mountSlot, renderSpec, type SlotOptions } from "./slot.js";
 export { openVibePanel, mountVibeButton, type VibePanelOptions } from "./panel.js";
 export { injectStyles, GRAFT_CSS } from "./styles.js";
 

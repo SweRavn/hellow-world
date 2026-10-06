@@ -16,7 +16,7 @@ public struct GraftSlotView: View {
     let slot: String
     let editable: Bool
 
-    @State private var bound: [Entry] = []
+    @State private var data: [String: JSON]?
     @State private var editing: WidgetSpec?
     @State private var removing: WidgetSpec?
 
@@ -26,12 +26,6 @@ public struct GraftSlotView: View {
         self.editable = editable
     }
 
-    private struct Entry: Identifiable {
-        let spec: WidgetSpec
-        let widget: BoundWidget?
-        var id: String { spec.id }
-    }
-
     private struct RefreshKey: Equatable {
         let widgets: [WidgetSpec]
         let dataVersion: Int
@@ -39,22 +33,20 @@ public struct GraftSlotView: View {
 
     public var body: some View {
         VStack(spacing: 12) {
-            ForEach(bound) { entry in
-                ZStack(alignment: .topTrailing) {
-                    if let w = entry.widget {
-                        WidgetView(w)
-                    } else {
-                        Text("“\(entry.spec.title)” could not be shown.").font(.footnote).foregroundStyle(.red)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    if editable {
-                        Menu {
-                            Button("Change…") { editing = entry.spec }
-                            Button("Remove", role: .destructive) { removing = entry.spec }
-                        } label: {
-                            Image(systemName: "ellipsis.circle").foregroundStyle(.secondary).padding(8)
+            if let data {
+                ForEach(graft.slotWidgets(slot)) { spec in
+                    ZStack(alignment: .topTrailing) {
+                        // .id(spec): an edited spec is a new view, so its input state starts fresh.
+                        LiveWidgetView(graft: graft, spec: spec, data: data).id(spec)
+                        if editable {
+                            Menu {
+                                Button("Change…") { editing = spec }
+                                Button("Remove", role: .destructive) { removing = spec }
+                            } label: {
+                                Image(systemName: "ellipsis.circle").foregroundStyle(.secondary).padding(8)
+                            }
+                            .accessibilityLabel("Options for \(spec.title)")
                         }
-                        .accessibilityLabel("Options for \(entry.spec.title)")
                     }
                 }
             }
@@ -70,11 +62,8 @@ public struct GraftSlotView: View {
     }
 
     private func refresh() async {
-        let specs = graft.slotWidgets(slot)
-        guard !specs.isEmpty, let data = try? await graft.snapshot() else {
-            bound = specs.map { Entry(spec: $0, widget: nil) }
-            return
-        }
-        bound = specs.map { spec in Entry(spec: spec, widget: try? graft.bind(spec, data: data)) }
+        guard !graft.slotWidgets(slot).isEmpty else { return }
+        // On failure keep the previous snapshot; with none, nothing is shown.
+        if let snapshot = try? await graft.snapshot() { data = snapshot }
     }
 }

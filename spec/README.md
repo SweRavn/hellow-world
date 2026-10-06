@@ -63,6 +63,7 @@ it only renders inside slots the developer placed.
   "title": "Food spend this month",
   "slot": "home.top",
   "prompt": "show how much I spent on food this month",   // original request
+  "state": { },                   // optional widget-local input values, see §2.4
   "bindings": {                   // optional named, reusable expressions
     "foodThisMonth": { "filter": [ { "var": "transactions" },
       { "and": [ { "==": [ { "var": "item.category" }, "Food" ] },
@@ -97,6 +98,7 @@ either a literal value or an expression (§3). `children` is an array of nodes.
 | `badge`     | `value` (expr), `color?` (expr)                                                         |
 | `divider`   | —                                                                                       |
 | `visible`   | `when` (expr boolean), `children` — renders children only when `when` is truthy         |
+| `input`     | `kind`, `bind`, `label?` (expr), `placeholder?` (expr), `min?`/`max?`/`step?` (number literals), `options?` (expr), `multiline?` (boolean) — see §2.4 |
 
 Inside a `list` `template`, the scope gains `item` (current element) and
 `index` (0-based).
@@ -109,8 +111,46 @@ Semantic tokens only, so widgets follow the host theme: `default`, `muted`,
 ### 2.3 Limits (enforced by every SDK validator)
 
 - at most **200** nodes, depth at most **12**
+- at most **20** state entries; text values at most **1000** characters
 - at most **50** bindings; bindings may reference earlier-declared bindings only
 - each expression evaluation is capped at **100 000** steps; exceeding it is a runtime error rendered as an error placeholder, never a crash
+
+### 2.4 State and inputs
+
+A widget can take user input. It declares named values with literal initial values in `state`; each
+`input` node names one of them in `bind`; formulas read the current value with `{"var": "state.<name>"}`
+(in bindings and props alike). Every change re-evaluates the widget. State is local to one rendered
+widget and is not persisted in v1.
+
+```jsonc
+"state": { "a": null, "b": null },
+"root": { "type": "card", "children": [
+  { "type": "input", "kind": "number", "bind": "a", "label": "First number" },
+  { "type": "input", "kind": "number", "bind": "b", "label": "Second number" },
+  { "type": "metric", "label": "Sum", "value": { "+": [ { "var": "state.a" }, { "var": "state.b" } ] } }
+] }
+```
+
+| `kind`   | control (web / Android / iOS)                       | state value                      | props |
+|----------|-----------------------------------------------------|----------------------------------|-------|
+| `text`   | text field / OutlinedTextField / TextField          | string or `null`                 | `placeholder`, `multiline` |
+| `number` | number field (decimal keyboard)                     | number, or `null` when empty or invalid | `placeholder`, `min`, `max`, `step` |
+| `slider` | range / Slider / Slider                             | number, clamped to `min..max` and snapped to `step` | `min`, `max` (required), `step` |
+| `toggle` | switch                                              | boolean                          | — |
+| `select` | dropdown; first entry "—" means `null`              | the chosen option's `value`      | `options` (required) |
+| `date`   | date picker                                         | `"YYYY-MM-DD"` or `null`         | — |
+
+`options` is an expression yielding an array of strings/numbers or `{label, value}` objects, so options
+can come from data (e.g. distinct categories via `group` + `pluck`).
+
+Rules (validator): `bind` must name a declared state entry; the initial value must suit the kind (as in the
+table; `slider` needs a number and `toggle` a boolean); props only for the kinds listed; `min <= max`,
+`step > 0`; inputs may not appear inside `list` templates; `state` is reserved and cannot be a binding or
+data source name.
+
+Raw control values are converted identically on every platform (`coerce`): numbers accept a decimal comma
+(`"1,5"` → 1.5) and are not clamped while typing; text is truncated to 1000 characters; dates keep the
+`YYYY-MM-DD` prefix of a date-time. See `conformance/inputs.json`.
 
 ---
 
@@ -167,8 +207,9 @@ before render). Type mismatches at runtime yield `null`, never throw.
 ## 4. Conformance
 
 `conformance/expressions.json` holds evaluation vectors
-(`{ name, data, expr, expect }`) and `conformance/validation.json` holds specs
-that must be accepted or rejected. Every SDK runs them in its test suite;
+(`{ name, data, expr, expect }`), `conformance/validation.json` holds specs
+that must be accepted or rejected, and `conformance/inputs.json` holds input
+coercion and select-option vectors, and `conformance/views.json` holds view-tree vectors (§6). Every SDK runs them in its test suite;
 `format`/`now`/`startOf` are locale/clock dependent and are excluded from the
 shared vectors.
 
@@ -177,3 +218,55 @@ shared vectors.
 `specVersion` increments only for breaking changes. SDKs must reject specs with
 a higher version than they support (the generator is told the SDK's version in
 the request).
+
+## 6. Headless view tree
+
+SDKs don't require any particular UI toolkit. Their core evaluates a widget (spec + data snapshot +
+input state) into a **view tree** of plain, display-ready nodes, and the host renders it with whatever
+components it likes. The DOM, Compose and SwiftUI renderers shipped with Graft are optional adapters
+over this tree. Every SDK produces the same tree for the same input (`conformance/views.json`).
+
+Every node has `type` and `key` (its path in the spec, e.g. `root.0.1`, stable across recomputes:
+use it as the component key). Values are already evaluated and formatted:
+
+| type | fields |
+|---|---|
+| `card` | `title` (string or null), `children` |
+| `column` | `gap` (number or null), `children` |
+| `row` | `gap`, `align` (`start` default), `children` |
+| `text` | `text`, `style` (`body` default), `color` (token, `default` if invalid) |
+| `metric` | `label`, `value`, `caption` (null when empty), `color` |
+| `progress` | `label` (or null), `value` (0 default), `max` (1 default), `fraction` (0..1) |
+| `list` | `items` (the template resolved per element, up to `limit`), `empty` (text when there are no elements, else null) |
+| `barChart` | `bars`: `[{ label, value, fraction }]` |
+| `badge` | `text`, `color` |
+| `divider` | — |
+| `input` | `kind`, `name` (state entry), `label`, `placeholder`, `min`, `max`, `step` (null when unset), `multiline`, `options` (`[{label, value}]`, select only), `value` (**getter**), and `set(raw)` (**setter**) |
+
+`visible` produces no node: when its condition holds, its children are spliced into the parent;
+otherwise they are dropped. A root that expands to several nodes is wrapped in a `column` keyed `root`.
+
+Display text: `null` → `""`, numbers in shortest form (`2`, `2.5`), other values as JSON.
+
+An input's `set(raw)` takes the raw value from any control (a string from a text field, a number from a
+slider, a boolean from a switch, an option's `value`), coerces it (§2.4), updates the widget's state and
+recomputes the tree. A **widget controller** owns that state, accepts new data snapshots and notifies
+subscribers with each new tree; this is the hook a UI layer connects to.
+
+## 7. Reserved: general code (future)
+
+The formula language stays the default because it is safe and acceptable to the app stores. A future
+version will add an opt-in construct for running general code, for apps where that is acceptable
+(web apps, internal or enterprise apps not distributed through public stores). Design constraints:
+
+- **Off unless the host enables it.** The developer grants it in the manifest, for example
+  `"policy": { "code": { "allowed": true, "runtime": "sandboxed-js", "timeoutMs": 50, "capabilities": [] } }`.
+  Generators must not emit code when the manifest doesn't allow it, and validators reject it.
+- **Sandboxed and capability-limited.** Code runs in an isolated runtime (a sandboxed iframe or Worker on the
+  web, an embedded JS engine on mobile) with no network, storage or DOM access unless the policy grants a
+  named capability. It receives the same scope as formulas (data sources, bindings, `state`) and returns JSON.
+- **Pure value.** It plugs in where an expression goes, e.g. `{ "code": { "source": "...", "inputs": [...] } }`,
+  so rendering, validation and limits stay as they are.
+- **The names `code` and `policy` are reserved** for this and must not be used for operators, components,
+  bindings or manifest fields.
+

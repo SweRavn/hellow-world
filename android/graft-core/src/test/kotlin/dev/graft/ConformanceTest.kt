@@ -3,6 +3,7 @@ package dev.graft
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonArray
@@ -56,5 +57,48 @@ class ConformanceTest {
         }
         if (failures.isNotEmpty()) fail(failures.joinToString("\n"))
         assertTrue(true)
+    }
+
+    @Test
+    fun inputs() {
+        val file = load("inputs.json")
+        val failures = mutableListOf<String>()
+        for (c in file.getValue("coerce").jsonArray.map { it.jsonObject }) {
+            val props = c["props"] as? JsonObject
+            val bounds = InputBounds(J.num(props?.get("min")), J.num(props?.get("max")), J.num(props?.get("step")))
+            val got = Inputs.coerce(c.getValue("kind").jsonPrimitive.content, c.getValue("raw"), bounds)
+            if (!same(got, c.getValue("expect"))) failures += "coerce ${c["name"]}: expected ${c["expect"]}, got $got"
+        }
+        for (c in file.getValue("options").jsonArray.map { it.jsonObject }) {
+            val got = JsonArray(Inputs.options(c.getValue("options")).map {
+                JsonObject(mapOf("label" to J.of(it.label), "value" to it.value))
+            })
+            if (!same(got, c.getValue("expect"))) failures += "options ${c["name"]}: expected ${c["expect"]}, got $got"
+        }
+        if (failures.isNotEmpty()) fail(failures.joinToString("\n"))
+    }
+
+    @Test
+    fun views() {
+        val file = load("views.json")
+        val data = file.getValue("data").jsonObject
+        val manifest = Manifest(
+            AppInfo("T"),
+            mapOf("tx" to DataSourceInfo("", SchemaNode("array")), "user" to DataSourceInfo("", SchemaNode("object"))),
+            mapOf("home.top" to SlotInfo("")),
+        )
+        val graft = Graft(AppInfo("T"), { JsonNull })
+        val failures = mutableListOf<String>()
+        for (c in file.getValue("cases").jsonArray.map { it.jsonObject }) {
+            val name = c.getValue("name").jsonPrimitive.content
+            val spec = when (val r = validateSpec(c.getValue("spec"), manifest)) {
+                is ValidationResult.Ok -> r.spec
+                is ValidationResult.Invalid -> { failures += "$name: invalid ${r.errors}"; continue }
+            }
+            val state = (c["state"] as? JsonObject)?.toMap() ?: Inputs.initialState(spec)
+            val got = resolveView(graft.bind(spec, data, state)).toJson()
+            if (!same(got, c.getValue("expect"))) failures += "$name:\n  expected ${c["expect"]}\n  got      $got"
+        }
+        if (failures.isNotEmpty()) fail(failures.joinToString("\n"))
     }
 }

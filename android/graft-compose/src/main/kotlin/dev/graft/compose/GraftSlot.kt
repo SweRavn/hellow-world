@@ -15,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -22,7 +23,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import dev.graft.BoundWidget
 import dev.graft.Graft
 import dev.graft.WidgetSpec
 import dev.graft.WidgetStore
@@ -53,32 +53,27 @@ fun GraftSlot(
     val all by graft.widgets.collectAsState()
     val dataVersion by graft.dataVersion.collectAsState()
     val widgets = remember(all, slotId) { graft.widgetsFor(slotId, all) }
-    var bound by remember { mutableStateOf<List<Pair<WidgetSpec, BoundWidget?>>>(emptyList()) }
+    var data by remember { mutableStateOf<Map<String, JsonElement>?>(null) }
     var editing by remember { mutableStateOf<WidgetSpec?>(null) }
     var removing by remember { mutableStateOf<WidgetSpec?>(null) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(widgets, dataVersion) {
-        if (widgets.isEmpty()) {
-            bound = emptyList()
-            return@LaunchedEffect
-        }
-        val data = graft.snapshot()
-        // Resolving bindings is where the heavy work happens: do it off the main thread.
-        bound = withContext(Dispatchers.Default) {
-            widgets.map { spec -> spec to runCatching { graft.bind(spec, data) }.getOrNull() }
-        }
+        if (widgets.isNotEmpty()) data = graft.snapshot()
     }
 
     Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        bound.forEach { (spec, widget) ->
-            Box(Modifier.fillMaxWidth()) {
-                if (widget != null) RenderWidget(widget, Modifier.fillMaxWidth())
-                else Text("“${spec.title}” could not be shown.", color = MaterialTheme.colorScheme.error)
-                if (editable) {
-                    Row(Modifier.align(Alignment.TopEnd).padding(4.dp)) {
-                        TextButton(onClick = { editing = spec }) { Text("Edit") }
-                        TextButton(onClick = { removing = spec }) { Text("✕") }
+        val snapshot = data ?: return@Column
+        widgets.forEach { spec ->
+            // key() keeps each widget's input state attached to it when widgets are added or removed.
+            key(spec.id) {
+                Box(Modifier.fillMaxWidth()) {
+                    LiveWidget(graft, spec, snapshot, Modifier.fillMaxWidth())
+                    if (editable) {
+                        Row(Modifier.align(Alignment.TopEnd).padding(4.dp)) {
+                            TextButton(onClick = { editing = spec }) { Text("Edit") }
+                            TextButton(onClick = { removing = spec }) { Text("✕") }
+                        }
                     }
                 }
             }
